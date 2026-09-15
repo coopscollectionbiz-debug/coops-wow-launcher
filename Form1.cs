@@ -193,7 +193,10 @@ public partial class Form1 : Form
         {
             statusLabel.Text = "Checking for updates...";
 
-            string json = await Http.GetStringAsync(ManifestUrl);
+            string manifestUrl =
+                ManifestUrl + "?t=" + DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+            string json = await Http.GetStringAsync(manifestUrl);
 
             PatchManifest? manifest = JsonSerializer.Deserialize<PatchManifest>(
                 json,
@@ -336,3 +339,4 @@ public sealed class PatchManifest
     public string SourceFile { get; set; } = "";
     public string Sha256 { get; set; } = "";
 }
+
