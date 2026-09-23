@@ -15,6 +15,13 @@
       "destination": "Interface\\AddOns\\MultiBot"
     },
     {
+      "name": "CleanBot",
+      "sourceFile": "CleanBot.zip",
+      "sha256": "10065319593E62F79B2382F6EE2141B64D64DAC0FE4DDCEE0663FEE46C36149A",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\CleanBot"
+    },
+    {
       "name": "DungeonClear",
       "sourceFile": "DungeonClear.zip",
       "sha256": "B624FE01D5672F98FC009C1C6989A2BFD39241404FB896EDE574CF06A042DD1B",
