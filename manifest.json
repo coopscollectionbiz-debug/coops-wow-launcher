@@ -1,5 +1,39 @@
-{
-    "fileName":  "patch-z.mpq",
-    "sourceFile":  "patch-z.mpq",
-    "sha256":  "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37"
+﻿{
+  "files": [
+    {
+      "name": "patch-z.mpq",
+      "sourceFile": "patch-z.mpq",
+      "sha256": "E76961ECBCC1800B3D5ADDD9267DD41BB6015A23085E3649F277954D361C8B37",
+      "type": "file",
+      "destination": "Data\\patch-z.mpq"
+    },
+    {
+      "name": "MultiBot",
+      "sourceFile": "MultiBot.zip",
+      "sha256": "FDD3BC881FC6F83E3F463F2A17FE41F74A18342E3F6B14D39A6E42F4EF5E890B",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\MultiBot"
+    },
+    {
+      "name": "DungeonClear",
+      "sourceFile": "DungeonClear.zip",
+      "sha256": "B624FE01D5672F98FC009C1C6989A2BFD39241404FB896EDE574CF06A042DD1B",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\DungeonClear"
+    },
+    {
+      "name": "Transmog",
+      "sourceFile": "Transmog.zip",
+      "sha256": "5358E7DE5FA077C8DA6852A00D07D9BB604ACE84BD203EAC2DF532EB4DD21707",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\Transmog"
+    },
+    {
+      "name": "TransmogCollection",
+      "sourceFile": "TransmogCollection.zip",
+      "sha256": "9198E91ADA6D06A8FBCFB7667079673835DBE7F02A4861D0E1BB21E0E281F434",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\TransmogCollection"
+    }
+  ]
 }
