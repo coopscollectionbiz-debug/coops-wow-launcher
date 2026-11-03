@@ -29,6 +29,12 @@ public partial class Form1 : Form
 
     private string wowPath = "";
 
+    // null = not checked yet; false = last check/repair failed (Launch asks first).
+    private bool? releaseVerified;
+
+    private static readonly Version LauncherVersion =
+        typeof(Form1).Assembly.GetName().Version ?? new Version(1, 0);
+
     public Form1()
     {
         InitializeComponent();
@@ -190,8 +196,20 @@ public partial class Form1 : Form
         patchButton.Enabled = false;
         launchButton.Enabled = false;
 
+        var progress = new Progress<string>(s => statusLabel.Text = s);
+        var updater = new ReleaseUpdater(
+            wowPath,
+            new HttpPayloadSource(Http, PatchBaseUrl),
+            LauncherVersion,
+            progress);
+
+        bool releaseApplied = false;
+
         try
         {
+            // Finish or undo an interrupted install first; works even when offline.
+            RecoveryResult? recovery = await updater.RecoverInterruptedInstallAsync();
+
             statusLabel.Text = "Checking for updates...";
 
             string manifestUrl =
@@ -199,47 +217,75 @@ public partial class Form1 : Form
 
             string json = await Http.GetStringAsync(manifestUrl);
 
-            UpdateManifest? manifest = JsonSerializer.Deserialize<UpdateManifest>(
-                json,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-            if (manifest?.Files == null || manifest.Files.Count == 0)
-                throw new InvalidDataException("The remote update manifest is invalid.");
-
-            int updated = 0;
+            UpdateManifest manifest = ReleaseUpdater.ParseManifest(json);
+            updater.ValidateManifest(manifest);
 
             foreach (UpdateFile file in manifest.Files)
             {
-                ValidateManifestEntry(file);
-
-                if (file.Type.Equals("file", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (await InstallFileAsync(file))
-                        updated++;
-                }
-                else if (file.Type.Equals("addon", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (await InstallAddonAsync(file))
-                        updated++;
-                }
-                else
+                if (!file.Type.Equals("file", StringComparison.OrdinalIgnoreCase) &&
+                    !file.Type.Equals("addon", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidDataException(
                         $"Unknown update type '{file.Type}' for {file.Name}.");
                 }
             }
 
-            statusLabel.Text = updated == 0
+            // Release patch files: baseline-checked, staged, verified, atomically
+            // activated and rolled back on failure.
+            ReleaseResult release = await Task.Run(() => updater.ApplyAsync(manifest));
+
+            // Patch files are verified; an addon problem below must not block launching.
+            releaseApplied = true;
+            releaseVerified = true;
+
+            int updated = release.Installed.Count;
+
+            foreach (UpdateFile file in manifest.Files)
+            {
+                if (file.Type.Equals("addon", StringComparison.OrdinalIgnoreCase) &&
+                    await InstallAddonAsync(file, updater))
+                {
+                    updated++;
+                }
+            }
+
+            string text = updated == 0 && !release.Changed
                 ? "Game is up to date."
                 : $"Update complete.\n{updated} component(s) installed.";
+
+            if (release.Quarantined.Count > 0)
+                text += $"\nOld patches were moved to {ReleaseUpdater.StateDirName}\\backups.";
+
+            if (release.RecoveryNote != null || recovery?.RolledBack == true)
+                text += "\nRecovered from an interrupted update.";
+
+            if (release.Warnings.Count > 0)
+                text += "\nNote: " + string.Join("; ", release.Warnings);
+
+            statusLabel.Text = text;
+        }
+        catch (ReleaseUpdateException ex)
+        {
+            if (!releaseApplied)
+                releaseVerified = false;
+
+            MessageBox.Show(
+                ex.UserText,
+                "Update Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+
+            statusLabel.Text = "Update check failed.\n" + ex.Message.Split('\n')[0];
         }
         catch (Exception ex)
         {
+            // Network and addon errors say nothing about the installed patch files.
+            if (!releaseApplied && ex is not HttpRequestException and not TaskCanceledException)
+                releaseVerified = false;
+
             MessageBox.Show(
-                ex.Message,
+                ex.Message + "\n\nYour game files were not changed by this error. " +
+                "Check your internet connection and press Check / Install Patch to try again.",
                 "Update Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
@@ -253,75 +299,7 @@ public partial class Form1 : Form
         }
     }
 
-    private static void ValidateManifestEntry(UpdateFile file)
-    {
-        if (string.IsNullOrWhiteSpace(file.Name) ||
-            string.IsNullOrWhiteSpace(file.SourceFile) ||
-            string.IsNullOrWhiteSpace(file.Sha256) ||
-            string.IsNullOrWhiteSpace(file.Type) ||
-            string.IsNullOrWhiteSpace(file.Destination))
-        {
-            throw new InvalidDataException(
-                "The remote update manifest contains an invalid entry.");
-        }
-
-        if (file.Destination.Contains(".."))
-            throw new InvalidDataException(
-                $"Unsafe destination in manifest for {file.Name}.");
-    }
-
-    private async Task<bool> InstallFileAsync(UpdateFile file)
-    {
-        string destination = Path.Combine(
-            wowPath,
-            file.Destination.Replace('/', Path.DirectorySeparatorChar));
-
-        if (File.Exists(destination))
-        {
-            string currentHash = CalculateSha256(destination);
-
-            if (currentHash.Equals(
-                file.Sha256,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        statusLabel.Text = $"Downloading {file.Name}...";
-        Application.DoEvents();
-
-        string tempFile = await DownloadAndVerifyAsync(file);
-
-        try
-        {
-            string? directory = Path.GetDirectoryName(destination);
-
-            if (!string.IsNullOrWhiteSpace(directory))
-                Directory.CreateDirectory(directory);
-
-            File.Copy(tempFile, destination, true);
-
-            string installedHash = CalculateSha256(destination);
-
-            if (!installedHash.Equals(
-                file.Sha256,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidDataException(
-                    $"{file.Name} failed verification after installation.");
-            }
-
-            return true;
-        }
-        finally
-        {
-            if (File.Exists(tempFile))
-                File.Delete(tempFile);
-        }
-    }
-
-    private async Task<bool> InstallAddonAsync(UpdateFile file)
+    private async Task<bool> InstallAddonAsync(UpdateFile file, ReleaseUpdater updater)
     {
         string destination = Path.Combine(
             wowPath,
@@ -344,9 +322,8 @@ public partial class Form1 : Form
         }
 
         statusLabel.Text = $"Downloading {file.Name}...";
-        Application.DoEvents();
 
-        string zipFile = await DownloadAndVerifyAsync(file);
+        string zipFile = await updater.DownloadAndVerifyAsync(file);
 
         string extractRoot = Path.Combine(
             Path.GetTempPath(),
@@ -433,40 +410,6 @@ public partial class Form1 : Form
         }
     }
 
-    private async Task<string> DownloadAndVerifyAsync(UpdateFile file)
-    {
-        string url = PatchBaseUrl + file.SourceFile;
-
-        byte[] data = await Http.GetByteArrayAsync(url);
-
-        string tempFile = Path.Combine(
-            Path.GetTempPath(),
-            "CoopsWoWLauncher-" + Guid.NewGuid().ToString("N") + ".tmp");
-
-        await File.WriteAllBytesAsync(tempFile, data);
-
-        string downloadedHash = CalculateSha256(tempFile);
-
-        if (!downloadedHash.Equals(
-            file.Sha256,
-            StringComparison.OrdinalIgnoreCase))
-        {
-            File.Delete(tempFile);
-
-            throw new InvalidDataException(
-                $"{file.Name} failed SHA-256 verification.");
-        }
-
-        return tempFile;
-    }
-
-    private static string CalculateSha256(string path)
-    {
-        using SHA256 sha = SHA256.Create();
-        using FileStream stream = File.OpenRead(path);
-        byte[] hash = sha.ComputeHash(stream);
-        return Convert.ToHexString(hash);
-    }
     private void LaunchButton_Click(object? sender, EventArgs e)
     {
         string exe = Path.Combine(wowPath, "Wow.exe");
@@ -478,6 +421,21 @@ public partial class Form1 : Form
             return;
         }
 
+        if (releaseVerified == false)
+        {
+            DialogResult answer = MessageBox.Show(
+                "The last update check did not complete, so your patch files may be missing, " +
+                "outdated or incomplete. The game may not work correctly on the server.\n\n" +
+                "Launch anyway?",
+                "Patch Not Verified",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (answer != DialogResult.Yes)
+                return;
+        }
+
         Process.Start(new ProcessStartInfo
         {
             FileName = exe,
@@ -486,18 +444,3 @@ public partial class Form1 : Form
         });
     }
 }
-
-public sealed class UpdateManifest
-{
-    public System.Collections.Generic.List<UpdateFile> Files { get; set; } = new();
-}
-
-public sealed class UpdateFile
-{
-    public string Name { get; set; } = "";
-    public string SourceFile { get; set; } = "";
-    public string Sha256 { get; set; } = "";
-    public string Type { get; set; } = "";
-    public string Destination { get; set; } = "";
-}
-

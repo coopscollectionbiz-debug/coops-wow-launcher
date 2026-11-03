@@ -1,46 +1,366 @@
-﻿{
-    "files":  [
-                  {
-                      "name":  "patch-z.mpq",
-                      "sourceFile":  "patch-z.mpq",
-                      "sha256":  "41BE2BF9DC11AB28C913131F29DA81F981E25D9DF8651BCEF7788FF891591FDC",
-                      "type":  "file",
-                      "destination":  "Data\\patch-z.mpq"
-                  },
-                  {
-                      "name":  "MultiBot",
-                      "sourceFile":  "MultiBot.zip",
-                      "sha256":  "FDD3BC881FC6F83E3F463F2A17FE41F74A18342E3F6B14D39A6E42F4EF5E890B",
-                      "type":  "addon",
-                      "destination":  "Interface\\AddOns\\MultiBot"
-                  },
-                  {
-                      "name":  "CleanBot",
-                      "sourceFile":  "CleanBot.zip",
-                      "sha256":  "10065319593E62F79B2382F6EE2141B64D64DAC0FE4DDCEE0663FEE46C36149A",
-                      "type":  "addon",
-                      "destination":  "Interface\\AddOns\\CleanBot"
-                  },
-                  {
-                      "name":  "DungeonClear",
-                      "sourceFile":  "DungeonClear.zip",
-                      "sha256":  "B624FE01D5672F98FC009C1C6989A2BFD39241404FB896EDE574CF06A042DD1B",
-                      "type":  "addon",
-                      "destination":  "Interface\\AddOns\\DungeonClear"
-                  },
-                  {
-                      "name":  "Transmog",
-                      "sourceFile":  "Transmog.zip",
-                      "sha256":  "5358E7DE5FA077C8DA6852A00D07D9BB604ACE84BD203EAC2DF532EB4DD21707",
-                      "type":  "addon",
-                      "destination":  "Interface\\AddOns\\Transmog"
-                  },
-                  {
-                      "name":  "TransmogCollection",
-                      "sourceFile":  "TransmogCollection.zip",
-                      "sha256":  "9198E91ADA6D06A8FBCFB7667079673835DBE7F02A4861D0E1BB21E0E281F434",
-                      "type":  "addon",
-                      "destination":  "Interface\\AddOns\\TransmogCollection"
-                  }
-              ]
+{
+  "schema": 2,
+  "releaseId": "release1-p3-20261103.1",
+  "payloadVersion": "release1-p2-20261103.2",
+  "p2ManifestRevision": "release1-p2-20261103.3",
+  "minimumLauncherVersion": "1.1.0",
+  "client": {
+    "build": "3.3.5.12340",
+    "locale": "enUS",
+    "description": "the supported HD enUS 3.3.5.12340 client (Coop's HD baseline with patch-a and patch-s)"
+  },
+  "files": [
+    {
+      "name": "patch-z.mpq",
+      "sourceFile": "patch-z-release1-p2-20261103.2.mpq",
+      "sha256": "1a80c3bd2b63af6b889fe90ba5776ec42bc17e487072e0e272ec5cd0f5d6ddde",
+      "size": 117629418,
+      "type": "file",
+      "destination": "Data\\patch-z.mpq",
+      "knownPreviousSha256": [
+        "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37",
+        "41be2bf9dc11ab28c913131f29da81f981e25d9df8651bcef7788ff891591fdc",
+        "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37"
+      ]
+    },
+    {
+      "name": "MultiBot",
+      "sourceFile": "MultiBot.zip",
+      "sha256": "fdd3bc881fc6f83e3f463f2a17fe41f74a18342e3f6b14d39a6e42f4ef5e890b",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\MultiBot",
+      "size": 1478007
+    },
+    {
+      "name": "CleanBot",
+      "sourceFile": "CleanBot.zip",
+      "sha256": "10065319593e62f79b2382f6ee2141b64d64dac0fe4ddcee0663fee46c36149a",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\CleanBot",
+      "size": 322995
+    },
+    {
+      "name": "DungeonClear",
+      "sourceFile": "DungeonClear.zip",
+      "sha256": "b624fe01d5672f98fc009c1c6989a2bfd39241404fb896ede574cf06a042dd1b",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\DungeonClear",
+      "size": 32496
+    },
+    {
+      "name": "Transmog",
+      "sourceFile": "Transmog.zip",
+      "sha256": "5358e7de5fa077c8da6852a00d07d9bb604ace84bd203eac2df532eb4dd21707",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\Transmog",
+      "size": 1094628
+    },
+    {
+      "name": "TransmogCollection",
+      "sourceFile": "TransmogCollection.zip",
+      "sha256": "9198e91ada6d06a8fbcfb7667079673835dbe7f02a4861d0e1bb21e0e281f434",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\TransmogCollection",
+      "size": 2994
+    }
+  ],
+  "obsoleteFiles": [
+    {
+      "path": "Data/patch-v.mpq",
+      "action": "quarantine",
+      "knownSha256": [
+        "5a2c746f681f164bc12107efd1dc6aef47bd2299b48acc0496816faba717dad7"
+      ],
+      "reason": "Consolidated into Release 1 patch-z; preserved in _CoopsLauncher/backups after verified install"
+    },
+    {
+      "path": "Data/patch-y.mpq",
+      "action": "quarantine",
+      "knownSha256": [
+        "3223e982f44fffffc794f6e9c7755cebdaf76cf0f50e8c37b5263605f5a7b100"
+      ],
+      "reason": "Consolidated into Release 1 patch-z; preserved in _CoopsLauncher/backups after verified install"
+    }
+  ],
+  "requiredBaseline": [
+    {
+      "path": "Data/common-2.mpq",
+      "sha256": "dff2ffe84fa5df2dcaf2f45455e15c3b789a4d01bdf4c948c5978015e107c581",
+      "size": 1810430608,
+      "critical": false
+    },
+    {
+      "path": "Data/common.mpq",
+      "sha256": "8bd2d5242bf2e3a1eb1f50ba90aa09886bea43310e2a500a9ba64cdfc7736ea2",
+      "size": 2881154863,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/backup-enus.mpq",
+      "sha256": "1363bcf2b9fd713948766674462681bc06c57d6cbb145c293573c501d0538acc",
+      "size": 163372036,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/base-enus.mpq",
+      "sha256": "f8a8dfcd3165eef7656a32a5976a2f848eb6f0273f412ff7fcfc20ff43ef4e8f",
+      "size": 29225789,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/expansion-locale-enus.mpq",
+      "sha256": "8c0a07247a2f47149b4f32c86689f9adec53ff399d4fa1f46684c4a884ccbe3a",
+      "size": 17421123,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/expansion-speech-enus.mpq",
+      "sha256": "8c384354da5fe2555402048008741d048cb74863eb5f26ec46654bb6936eb33b",
+      "size": 241298910,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/lichking-locale-enus.mpq",
+      "sha256": "7c71a0b617b942f5f1dd21226eda160c01e92990c3f2ae8bb137a77f4a2541f4",
+      "size": 12642308,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/lichking-speech-enus.mpq",
+      "sha256": "742d6edae34dd03b5492179d46c748e51f16f455c35b710257efb6459f89f5cd",
+      "size": 354400446,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/locale-enus.mpq",
+      "sha256": "ff2e6ad9c5a07018278c936df7a1bbd5e1c15130ddf7d038175bc31ef709fde6",
+      "size": 204725970,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-2.mpq",
+      "sha256": "620c760b10070cb7e6d8d43adff1c1ab68beb101c7a8fd4d5fa26df8216d35b4",
+      "size": 225570191,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-3.mpq",
+      "sha256": "d61a60297af9044d926754d997cd5aa630500cd003d41983a9ccb5b324d61299",
+      "size": 100373935,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-a.mpq",
+      "sha256": "b14f87888e92b7e8939d394a0a4245c999cb47dbfe4508b1b3a8cacf1ba9d3b1",
+      "size": 32930769,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-c.mpq",
+      "sha256": "29eb44d854c3ac186b0f57589ccf87b0a6384b3e7f95d14b65f8504e4e2f67f8",
+      "size": 5019723,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-d.mpq",
+      "sha256": "a7b61b0f03f936731b4750f791f50b93c9e6d10fd0c8dab02743af7261a0161e",
+      "size": 1468095,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-f.mpq",
+      "sha256": "4c275621893e0d16a619a29e385b267a07752a3f7e30ae7c90f6ba287d7be444",
+      "size": 15830582,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-k.mpq",
+      "sha256": "fedb55e0817e451e24ef076e92cf3f14f44f071e87ae20327902defd08f7b362",
+      "size": 4729876,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-m.mpq",
+      "sha256": "f9a84caf012435eae9fd5f9e3b8bccfe2e34806f9d9fe014078ac48a02ea5695",
+      "size": 53431239,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-q.mpq",
+      "sha256": "de917874d628679f2ae1e92b23255ce1cc6e8feb880c279a53c8efe69705ca55",
+      "size": 38886999,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-s.mpq",
+      "sha256": "8e93978c9f189876d8fb2b8f0bd80253aea98a99131494fbe1fb571daae061a5",
+      "size": 17695188,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-w.mpq",
+      "sha256": "7ec1cba81dd5d0f766c6d61971b20059fa16e4a68902af4f1e857e6c380bffcb",
+      "size": 27646368,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus-x.mpq",
+      "sha256": "16037b47b76bf8fe2ab3001ecbda837d457861423254b7d9f7fa6edbf775f960",
+      "size": 90237328,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/patch-enus.mpq",
+      "sha256": "c1c06b0d0c34c331b21df7cdd25cc422a650efbd477e42b80849ba30b2e5fc99",
+      "size": 296616080,
+      "critical": false
+    },
+    {
+      "path": "Data/enus/speech-enus.mpq",
+      "sha256": "71b3e7e40ae35373f9e044ef6987543ba3f02275fa74302d720d6e968b3a636b",
+      "size": 438856302,
+      "critical": false
+    },
+    {
+      "path": "Data/expansion.mpq",
+      "sha256": "7a9bbcb6513ddd2a3141d37b44c88a4b731ddd9650612c2d1bcdac27c200c58b",
+      "size": 1921219945,
+      "critical": false
+    },
+    {
+      "path": "Data/lichking.mpq",
+      "sha256": "4573d7f15b941e298700a097728f073b8915e47a7a1404378ed4d7c7e2576bbb",
+      "size": 2577893261,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-2.mpq",
+      "sha256": "c8b78bb75bcf5773e9ae99e11bdfcabc2a37aed3da947367d8af808d4d3c23c6",
+      "size": 1401729059,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-3.mpq",
+      "sha256": "167c6aa5750a9ea78b72fd8edaf7d5cebe87b5c6c74144be17dafb0dba780c2d",
+      "size": 641126119,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-5.mpq",
+      "sha256": "4eccfbfdac13fb65731e00ec91e643aca1de1a0368da1f0ebea1a23153991292",
+      "size": 15176150,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-6.mpq",
+      "sha256": "e931496f844c394c19080990481fa22f2734a279b94d435c5cebf0388cd7613d",
+      "size": 2373133892,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-7.mpq",
+      "sha256": "462191cf37a184558cb6e226096acde57cda631bb17184d77b99ed4ad86ea409",
+      "size": 1343956822,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-8.mpq",
+      "sha256": "886401a195c9050bd9184288663b49b4aa1ba058ebd804be6390a62c4363646c",
+      "size": 212094542,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-a.mpq",
+      "sha256": "80266c572f9b9753e904a01427dc2883b5316dddf38e990c36963eb54148de1a",
+      "size": 2252223733,
+      "critical": true,
+      "note": "HD Goblin male/female models"
+    },
+    {
+      "path": "Data/patch-b.mpq",
+      "sha256": "a4bf07b5a50c71a168d77480b6538fb69a89fefcdf5b41dab1dc18319cc17251",
+      "size": 1668084,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-c.mpq",
+      "sha256": "88f2c702818ab5c80c97be400de2aeea42d759dac3427334390203fa3461b77d",
+      "size": 482467019,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-e.mpq",
+      "sha256": "f3c4281daf855c13cd74b135aa0ab871a35e92899d700b48c4c53c6de113df54",
+      "size": 261871142,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-f.mpq",
+      "sha256": "2af451370e8945f2a8e3b9d7df71a5ae58793c2925df69d1a2123d2278aecd2e",
+      "size": 2221967166,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-i.mpq",
+      "sha256": "0400c0611b49e493bc633ee289bb52e116744f0bd817a352bedeb896b5085ac4",
+      "size": 6531615,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-j.mpq",
+      "sha256": "767b1186bd7891e6e12b643a2b8baa15502b41f81e667ecbfaac4dad0476c9bc",
+      "size": 13363718,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-k.mpq",
+      "sha256": "a13e08b5db22002e5a23ac5d7f6a64e619aab6c0d58695fe57c89756cda197c2",
+      "size": 4881509,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-s.mpq",
+      "sha256": "ec6f91ceea7bdbc7e5d0b51d566a9f5d59ccc8387bf00ac2ab7069be16096eb5",
+      "size": 166341703,
+      "critical": true,
+      "note": "HD client prerequisite"
+    },
+    {
+      "path": "Data/patch-t.mpq",
+      "sha256": "c192eff764a386c18cbb12df34082ff68535b4a5173604f62aaecdfa7017ca9a",
+      "size": 736709383,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-u.mpq",
+      "sha256": "56061c4c33e71bdcdca8e20306f4fd2905c29414b5cff70c9b7141c9b92b7b10",
+      "size": 36700340,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-w.mpq",
+      "sha256": "7ec1cba81dd5d0f766c6d61971b20059fa16e4a68902af4f1e857e6c380bffcb",
+      "size": 27646368,
+      "critical": false
+    },
+    {
+      "path": "Data/patch-x.mpq",
+      "sha256": "16037b47b76bf8fe2ab3001ecbda837d457861423254b7d9f7fa6edbf775f960",
+      "size": 90237328,
+      "critical": false
+    },
+    {
+      "path": "Data/patch.mpq",
+      "sha256": "92b4a94a6c7a23c0b9fd88c47823e41792879a7ee1f70c2349a255153ca25d54",
+      "size": 4004713057,
+      "critical": false
+    },
+    {
+      "path": "Wow.exe",
+      "sha256": "4c459de64d38b5795becc6c01a03ba00d34686598fae707c442446722617868a",
+      "size": 7704216,
+      "critical": true,
+      "note": "WoW 3.3.5.12340 executable"
+    }
+  ]
 }
