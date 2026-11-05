@@ -1,8 +1,8 @@
 {
   "schema": 2,
-  "releaseId": "release1-p3-20261103.1",
-  "payloadVersion": "release1-p2-20261103.2",
-  "p2ManifestRevision": "release1-p2-20261103.3",
+  "releaseId": "release1-rc-20261104.1",
+  "payloadVersion": "release1-p7-client-20261104.1",
+  "p2ManifestRevision": "release1-p2-20261103.3 + P7 client fixes (see RELEASE1-CLIENT-LAUNCHER.md)",
   "minimumLauncherVersion": "1.1.0",
   "client": {
     "build": "3.3.5.12340",
@@ -12,15 +12,15 @@
   "files": [
     {
       "name": "patch-z.mpq",
-      "sourceFile": "patch-z-release1-p2-20261103.2.mpq",
-      "sha256": "1a80c3bd2b63af6b889fe90ba5776ec42bc17e487072e0e272ec5cd0f5d6ddde",
-      "size": 117629418,
+      "sourceFile": "patch-z-release1-p7-client-20261104.1.mpq",
+      "sha256": "565d1b17e676ea54f78b7a0898dbbda064ee27b0c629344b42578e9aea660dee",
+      "size": 134636848,
       "type": "file",
       "destination": "Data\\patch-z.mpq",
       "knownPreviousSha256": [
         "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37",
         "41be2bf9dc11ab28c913131f29da81f981e25d9df8651bcef7788ff891591fdc",
-        "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37"
+        "1a80c3bd2b63af6b889fe90ba5776ec42bc17e487072e0e272ec5cd0f5d6ddde"
       ]
     },
     {
