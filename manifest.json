@@ -1,9 +1,9 @@
 {
   "schema": 2,
-  "releaseId": "release1-rc-20261104.1",
+  "releaseId": "release1-hd-prerequisites-20261106.1",
   "payloadVersion": "release1-p7-client-20261104.1",
   "p2ManifestRevision": "release1-p2-20261103.3 + P7 client fixes (see RELEASE1-CLIENT-LAUNCHER.md)",
-  "minimumLauncherVersion": "1.1.0",
+  "minimumLauncherVersion": "1.2.0",
   "client": {
     "build": "3.3.5.12340",
     "locale": "enUS",
@@ -62,6 +62,291 @@
       "type": "addon",
       "destination": "Interface\\AddOns\\TransmogCollection",
       "size": 2994
+    },
+    {
+      "name": "Data/enus/patch-enus-a.mpq",
+      "sourceFile": "hd-b14f87888e92b7e8939d394a0a4245c999cb47dbfe4508b1b3a8cacf1ba9d3b1.mpq",
+      "sha256": "b14f87888e92b7e8939d394a0a4245c999cb47dbfe4508b1b3a8cacf1ba9d3b1",
+      "size": 32930769,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-a.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-c.mpq",
+      "sourceFile": "hd-29eb44d854c3ac186b0f57589ccf87b0a6384b3e7f95d14b65f8504e4e2f67f8.mpq",
+      "sha256": "29eb44d854c3ac186b0f57589ccf87b0a6384b3e7f95d14b65f8504e4e2f67f8",
+      "size": 5019723,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-c.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-d.mpq",
+      "sourceFile": "hd-a7b61b0f03f936731b4750f791f50b93c9e6d10fd0c8dab02743af7261a0161e.mpq",
+      "sha256": "a7b61b0f03f936731b4750f791f50b93c9e6d10fd0c8dab02743af7261a0161e",
+      "size": 1468095,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-d.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-f.mpq",
+      "sourceFile": "hd-4c275621893e0d16a619a29e385b267a07752a3f7e30ae7c90f6ba287d7be444.mpq",
+      "sha256": "4c275621893e0d16a619a29e385b267a07752a3f7e30ae7c90f6ba287d7be444",
+      "size": 15830582,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-f.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-k.mpq",
+      "sourceFile": "hd-fedb55e0817e451e24ef076e92cf3f14f44f071e87ae20327902defd08f7b362.mpq",
+      "sha256": "fedb55e0817e451e24ef076e92cf3f14f44f071e87ae20327902defd08f7b362",
+      "size": 4729876,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-k.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-m.mpq",
+      "sourceFile": "hd-f9a84caf012435eae9fd5f9e3b8bccfe2e34806f9d9fe014078ac48a02ea5695.mpq",
+      "sha256": "f9a84caf012435eae9fd5f9e3b8bccfe2e34806f9d9fe014078ac48a02ea5695",
+      "size": 53431239,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-m.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-q.mpq",
+      "sourceFile": "hd-de917874d628679f2ae1e92b23255ce1cc6e8feb880c279a53c8efe69705ca55.mpq",
+      "sha256": "de917874d628679f2ae1e92b23255ce1cc6e8feb880c279a53c8efe69705ca55",
+      "size": 38886999,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-q.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-w.mpq",
+      "sourceFile": "hd-7ec1cba81dd5d0f766c6d61971b20059fa16e4a68902af4f1e857e6c380bffcb.mpq",
+      "sha256": "7ec1cba81dd5d0f766c6d61971b20059fa16e4a68902af4f1e857e6c380bffcb",
+      "size": 27646368,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-w.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/enus/patch-enus-x.mpq",
+      "sourceFile": "hd-16037b47b76bf8fe2ab3001ecbda837d457861423254b7d9f7fa6edbf775f960.mpq",
+      "sha256": "16037b47b76bf8fe2ab3001ecbda837d457861423254b7d9f7fa6edbf775f960",
+      "size": 90237328,
+      "type": "file",
+      "destination": "Data/enus/patch-enus-x.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-5.mpq",
+      "sourceFile": "hd-4eccfbfdac13fb65731e00ec91e643aca1de1a0368da1f0ebea1a23153991292.mpq",
+      "sha256": "4eccfbfdac13fb65731e00ec91e643aca1de1a0368da1f0ebea1a23153991292",
+      "size": 15176150,
+      "type": "file",
+      "destination": "Data/patch-5.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-6.mpq",
+      "sourceFile": "hd-e931496f844c394c19080990481fa22f2734a279b94d435c5cebf0388cd7613d.mpq",
+      "sha256": "e931496f844c394c19080990481fa22f2734a279b94d435c5cebf0388cd7613d",
+      "size": 2373133892,
+      "type": "file",
+      "destination": "Data/patch-6.mpq",
+      "suppliesBaseline": true,
+      "parts": [
+        {
+          "sourceFile": "hd-e931496f844c394c19080990481fa22f2734a279b94d435c5cebf0388cd7613d.mpq.part001",
+          "size": 1000000000,
+          "sha256": "3ca43cdd0c509ccb8264f75e9ffc9b1fd0331366c99eb67382cf614310c27d55"
+        },
+        {
+          "sourceFile": "hd-e931496f844c394c19080990481fa22f2734a279b94d435c5cebf0388cd7613d.mpq.part002",
+          "size": 1000000000,
+          "sha256": "251c52c994a8e4583336728b286aee7ff8997048716c7e29cabc262a33260a69"
+        },
+        {
+          "sourceFile": "hd-e931496f844c394c19080990481fa22f2734a279b94d435c5cebf0388cd7613d.mpq.part003",
+          "size": 373133892,
+          "sha256": "798386d334867bb82d898d567473ecae46692ba320eac15547d982710d62d994"
+        }
+      ]
+    },
+    {
+      "name": "Data/patch-7.mpq",
+      "sourceFile": "hd-462191cf37a184558cb6e226096acde57cda631bb17184d77b99ed4ad86ea409.mpq",
+      "sha256": "462191cf37a184558cb6e226096acde57cda631bb17184d77b99ed4ad86ea409",
+      "size": 1343956822,
+      "type": "file",
+      "destination": "Data/patch-7.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-8.mpq",
+      "sourceFile": "hd-886401a195c9050bd9184288663b49b4aa1ba058ebd804be6390a62c4363646c.mpq",
+      "sha256": "886401a195c9050bd9184288663b49b4aa1ba058ebd804be6390a62c4363646c",
+      "size": 212094542,
+      "type": "file",
+      "destination": "Data/patch-8.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-a.mpq",
+      "sourceFile": "hd-80266c572f9b9753e904a01427dc2883b5316dddf38e990c36963eb54148de1a.mpq",
+      "sha256": "80266c572f9b9753e904a01427dc2883b5316dddf38e990c36963eb54148de1a",
+      "size": 2252223733,
+      "type": "file",
+      "destination": "Data/patch-a.mpq",
+      "suppliesBaseline": true,
+      "parts": [
+        {
+          "sourceFile": "hd-80266c572f9b9753e904a01427dc2883b5316dddf38e990c36963eb54148de1a.mpq.part001",
+          "size": 1000000000,
+          "sha256": "81005686c71957266129c9bfa3062381415a1d429bdf25ce8372b0d209f1803e"
+        },
+        {
+          "sourceFile": "hd-80266c572f9b9753e904a01427dc2883b5316dddf38e990c36963eb54148de1a.mpq.part002",
+          "size": 1000000000,
+          "sha256": "93dc2a78944795328c23ca644d685ff704b54a2bd270f4f692b8fd436c725f7c"
+        },
+        {
+          "sourceFile": "hd-80266c572f9b9753e904a01427dc2883b5316dddf38e990c36963eb54148de1a.mpq.part003",
+          "size": 252223733,
+          "sha256": "b5367f76ee0d2e5a4a4bbd0894f994eb006be19153a497a0ecba726fafb3d46b"
+        }
+      ]
+    },
+    {
+      "name": "Data/patch-b.mpq",
+      "sourceFile": "hd-a4bf07b5a50c71a168d77480b6538fb69a89fefcdf5b41dab1dc18319cc17251.mpq",
+      "sha256": "a4bf07b5a50c71a168d77480b6538fb69a89fefcdf5b41dab1dc18319cc17251",
+      "size": 1668084,
+      "type": "file",
+      "destination": "Data/patch-b.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-c.mpq",
+      "sourceFile": "hd-88f2c702818ab5c80c97be400de2aeea42d759dac3427334390203fa3461b77d.mpq",
+      "sha256": "88f2c702818ab5c80c97be400de2aeea42d759dac3427334390203fa3461b77d",
+      "size": 482467019,
+      "type": "file",
+      "destination": "Data/patch-c.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-e.mpq",
+      "sourceFile": "hd-f3c4281daf855c13cd74b135aa0ab871a35e92899d700b48c4c53c6de113df54.mpq",
+      "sha256": "f3c4281daf855c13cd74b135aa0ab871a35e92899d700b48c4c53c6de113df54",
+      "size": 261871142,
+      "type": "file",
+      "destination": "Data/patch-e.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-f.mpq",
+      "sourceFile": "hd-2af451370e8945f2a8e3b9d7df71a5ae58793c2925df69d1a2123d2278aecd2e.mpq",
+      "sha256": "2af451370e8945f2a8e3b9d7df71a5ae58793c2925df69d1a2123d2278aecd2e",
+      "size": 2221967166,
+      "type": "file",
+      "destination": "Data/patch-f.mpq",
+      "suppliesBaseline": true,
+      "parts": [
+        {
+          "sourceFile": "hd-2af451370e8945f2a8e3b9d7df71a5ae58793c2925df69d1a2123d2278aecd2e.mpq.part001",
+          "size": 1000000000,
+          "sha256": "224966fcff676b4d086f7f3379f83d8423082236fadc5de77b29b83646d4e169"
+        },
+        {
+          "sourceFile": "hd-2af451370e8945f2a8e3b9d7df71a5ae58793c2925df69d1a2123d2278aecd2e.mpq.part002",
+          "size": 1000000000,
+          "sha256": "c070ba6a3b21151887bad1bfb90354bbb60f3737a58fce100e1a54d202c523f1"
+        },
+        {
+          "sourceFile": "hd-2af451370e8945f2a8e3b9d7df71a5ae58793c2925df69d1a2123d2278aecd2e.mpq.part003",
+          "size": 221967166,
+          "sha256": "116d18a155c12242a5085ccda6a5e2f879808138ff64e3c8378c785a3852d7cc"
+        }
+      ]
+    },
+    {
+      "name": "Data/patch-i.mpq",
+      "sourceFile": "hd-0400c0611b49e493bc633ee289bb52e116744f0bd817a352bedeb896b5085ac4.mpq",
+      "sha256": "0400c0611b49e493bc633ee289bb52e116744f0bd817a352bedeb896b5085ac4",
+      "size": 6531615,
+      "type": "file",
+      "destination": "Data/patch-i.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-j.mpq",
+      "sourceFile": "hd-767b1186bd7891e6e12b643a2b8baa15502b41f81e667ecbfaac4dad0476c9bc.mpq",
+      "sha256": "767b1186bd7891e6e12b643a2b8baa15502b41f81e667ecbfaac4dad0476c9bc",
+      "size": 13363718,
+      "type": "file",
+      "destination": "Data/patch-j.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-k.mpq",
+      "sourceFile": "hd-a13e08b5db22002e5a23ac5d7f6a64e619aab6c0d58695fe57c89756cda197c2.mpq",
+      "sha256": "a13e08b5db22002e5a23ac5d7f6a64e619aab6c0d58695fe57c89756cda197c2",
+      "size": 4881509,
+      "type": "file",
+      "destination": "Data/patch-k.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-s.mpq",
+      "sourceFile": "hd-ec6f91ceea7bdbc7e5d0b51d566a9f5d59ccc8387bf00ac2ab7069be16096eb5.mpq",
+      "sha256": "ec6f91ceea7bdbc7e5d0b51d566a9f5d59ccc8387bf00ac2ab7069be16096eb5",
+      "size": 166341703,
+      "type": "file",
+      "destination": "Data/patch-s.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-t.mpq",
+      "sourceFile": "hd-c192eff764a386c18cbb12df34082ff68535b4a5173604f62aaecdfa7017ca9a.mpq",
+      "sha256": "c192eff764a386c18cbb12df34082ff68535b4a5173604f62aaecdfa7017ca9a",
+      "size": 736709383,
+      "type": "file",
+      "destination": "Data/patch-t.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-u.mpq",
+      "sourceFile": "hd-56061c4c33e71bdcdca8e20306f4fd2905c29414b5cff70c9b7141c9b92b7b10.mpq",
+      "sha256": "56061c4c33e71bdcdca8e20306f4fd2905c29414b5cff70c9b7141c9b92b7b10",
+      "size": 36700340,
+      "type": "file",
+      "destination": "Data/patch-u.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-w.mpq",
+      "sourceFile": "hd-7ec1cba81dd5d0f766c6d61971b20059fa16e4a68902af4f1e857e6c380bffcb.mpq",
+      "sha256": "7ec1cba81dd5d0f766c6d61971b20059fa16e4a68902af4f1e857e6c380bffcb",
+      "size": 27646368,
+      "type": "file",
+      "destination": "Data/patch-w.mpq",
+      "suppliesBaseline": true
+    },
+    {
+      "name": "Data/patch-x.mpq",
+      "sourceFile": "hd-16037b47b76bf8fe2ab3001ecbda837d457861423254b7d9f7fa6edbf775f960.mpq",
+      "sha256": "16037b47b76bf8fe2ab3001ecbda837d457861423254b7d9f7fa6edbf775f960",
+      "size": 90237328,
+      "type": "file",
+      "destination": "Data/patch-x.mpq",
+      "suppliesBaseline": true
     }
   ],
   "obsoleteFiles": [
@@ -99,13 +384,17 @@
       "path": "Data/enus/backup-enus.mpq",
       "sha256": "1363bcf2b9fd713948766674462681bc06c57d6cbb145c293573c501d0538acc",
       "size": 163372036,
-      "critical": false
+      "critical": false,
+      "optional": true,
+      "note": "Inactive locale backup archive; not loaded by the supported executable."
     },
     {
       "path": "Data/enus/base-enus.mpq",
       "sha256": "f8a8dfcd3165eef7656a32a5976a2f848eb6f0273f412ff7fcfc20ff43ef4e8f",
       "size": 29225789,
-      "critical": false
+      "critical": false,
+      "optional": true,
+      "note": "Inactive locale backup archive; not loaded by the supported executable."
     },
     {
       "path": "Data/enus/expansion-locale-enus.mpq",
@@ -195,7 +484,9 @@
       "path": "Data/enus/patch-enus-s.mpq",
       "sha256": "8e93978c9f189876d8fb2b8f0bd80253aea98a99131494fbe1fb571daae061a5",
       "size": 17695188,
-      "critical": false
+      "critical": false,
+      "optional": true,
+      "note": "All payloads overridden by mandatory Data/patch-s.mpq, Data/patch-x.mpq and verified release patch-z.mpq."
     },
     {
       "path": "Data/enus/patch-enus-w.mpq",

@@ -46,6 +46,17 @@ public sealed class UpdateFile
     public string Destination { get; set; } = "";
     public long? Size { get; set; }
     public List<string> KnownPreviousSha256 { get; set; } = new();
+    // Only missing, exactly qualified baseline archives can be supplied this way.
+    // Existing mismatched baseline files remain incompatible and are not replaced.
+    public bool SuppliesBaseline { get; set; }
+    public List<PayloadPart> Parts { get; set; } = new();
+}
+
+public sealed class PayloadPart
+{
+    public string SourceFile { get; set; } = "";
+    public string Sha256 { get; set; } = "";
+    public long Size { get; set; }
 }
 
 public sealed class ObsoleteFile
@@ -62,6 +73,10 @@ public sealed class BaselineFile
     public string Sha256 { get; set; } = "";
     public long Size { get; set; }
     public bool Critical { get; set; }
+    // Absence is allowed only when the manifest explicitly qualifies a file as
+    // optional. Present files still undergo the same size and SHA-256 checks.
+    // Critical is descriptive metadata, not a requirement/optionality switch.
+    public bool Optional { get; set; }
     public string? Note { get; set; }
 }
 
@@ -310,6 +325,7 @@ public sealed class ReleaseUpdater
                 "Download the latest Coop's WoW Launcher, then run it again. Nothing was changed.");
         }
 
+        var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (UpdateFile f in m.Files)
         {
             if (string.IsNullOrWhiteSpace(f.Name) || string.IsNullOrWhiteSpace(f.SourceFile) ||
@@ -322,10 +338,52 @@ public sealed class ReleaseUpdater
             }
 
             Resolve(f.Destination);
+            if (!destinations.Add(Norm(f.Destination)))
+                throw InvalidManifest("Duplicate update destination: " + f.Destination);
+
+            if (f.SuppliesBaseline && !SuppliesBaseline(m, f.Destination))
+                throw InvalidManifest("A baseline payload does not match its qualified prerequisite: " + f.Destination);
+
+            if (f.Parts == null)
+                throw InvalidManifest("Invalid payload parts.");
+            if (f.Parts.Count > 0)
+            {
+                long total = 0;
+                foreach (PayloadPart p in f.Parts)
+                {
+                    if (p == null || !SafeSource(p.SourceFile) || !ValidHash(p.Sha256) || p.Size <= 0 ||
+                        p.Size > long.MaxValue - total)
+                        throw InvalidManifest("Invalid multipart payload: " + f.Name);
+                    total += p.Size;
+                }
+                if (!f.Type.Equals("file", StringComparison.OrdinalIgnoreCase) || total != f.Size ||
+                    !ValidHash(f.Sha256))
+                    throw InvalidManifest("Multipart size or hash is invalid: " + f.Name);
+            }
         }
 
         foreach (ObsoleteFile o in m.ObsoleteFiles) Resolve(o.Path);
         foreach (BaselineFile b in m.RequiredBaseline) Resolve(b.Path);
+    }
+
+    private static bool ValidHash(string? hash) => hash != null && Regex.IsMatch(hash, @"\A[0-9a-fA-F]{64}\z");
+    private static bool SafeSource(string? name) => !string.IsNullOrWhiteSpace(name) &&
+        name != "." && !name.Contains("..") && name.IndexOfAny(new[] { '/', '\\', ':', '?', '#' }) < 0;
+    private static ReleaseUpdateException InvalidManifest(string message) =>
+        new("MANIFEST_INVALID", message, "Nothing was changed. Contact the server admin.");
+
+    private static bool SuppliesBaseline(UpdateManifest m, string path)
+    {
+        string normalized = Norm(path);
+        // Baseline provisioning is limited to custom HD archives. Never supply
+        // executables or stock/base archives to turn an incompatible client into a match.
+        if (!Regex.IsMatch(normalized, @"\Adata/(patch-[5-9a-z]|enus/patch-enus-[a-z])\.mpq\z"))
+            return false;
+        BaselineFile? b = m.RequiredBaseline.SingleOrDefault(b => Norm(b.Path) == normalized);
+        return b != null && !b.Optional && ValidHash(b.Sha256) && b.Size > 0 &&
+            m.Files.Any(f => f.SuppliesBaseline && f.Type.Equals("file", StringComparison.OrdinalIgnoreCase) &&
+                Norm(f.Destination) == normalized && f.Size == b.Size &&
+                b.Sha256.Equals(f.Sha256, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -386,7 +444,8 @@ public sealed class ReleaseUpdater
 
             if (!File.Exists(full))
             {
-                report.Missing.Add(label);
+                if (!b.Optional && !SuppliesBaseline(m, b.Path))
+                    report.Missing.Add(label);
                 continue;
             }
 
@@ -557,8 +616,24 @@ public sealed class ReleaseUpdater
 
         // Stage (download + verify) everything first; the client is untouched until all payloads verify.
         var staged = new Dictionary<UpdateFile, string>();
+        var activationPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var n in needed)
-            staged[n.File] = await DownloadAndVerifyAsync(n.File, ct);
+        {
+            string payload = await DownloadAndVerifyAsync(n.File, ct);
+            if (!activationPaths.Add(payload))
+            {
+                // Equal content can supply different destinations (global/locale
+                // archives). Each journal op needs its own movable staging file.
+                string destinationKey = Convert.ToHexString(SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(Norm(n.File.Destination)))).ToLowerInvariant();
+                string activation = Path.Combine(StagingDir, n.File.Sha256.ToLowerInvariant() + "-" + destinationKey + ".install");
+                EnsureFreeSpace(new FileInfo(payload).Length);
+                File.Copy(payload, activation, true);
+                await VerifyFileAsync(activation, n.File.Sha256, new FileInfo(payload).Length, "staged " + n.File.Name, ct);
+                payload = activation;
+            }
+            staged[n.File] = payload;
+        }
 
         // Refuse to start while WoW (or anything else) holds a file we must move.
         foreach (string p in needed.Where(x => x.Exists).Select(x => x.Dest).Concat(obsolete.Select(x => x.Full)))
@@ -752,6 +827,39 @@ public sealed class ReleaseUpdater
             if (await MatchesAsync(final, sha, file.Size, ct))
                 return final;
             File.Delete(final);
+        }
+
+        if (file.Parts.Count > 0)
+        {
+            // Use the same resumable SHA-256 downloader for every part. Nothing
+            // reaches the client until all parts and the full assembled MPQ verify.
+            var parts = new List<string>();
+            foreach (PayloadPart p in file.Parts)
+                parts.Add(await DownloadAndVerifyAsync(new UpdateFile
+                {
+                    Name = p.SourceFile, SourceFile = p.SourceFile,
+                    Sha256 = p.Sha256, Size = p.Size
+                }, ct));
+            EnsureFreeSpace(file.Size ?? 0);
+            Report("Assembling and verifying " + file.Name + "...");
+            using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20, true))
+            {
+                foreach (string part in parts)
+                {
+                    using var input = new FileStream(part, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, true);
+                    await input.CopyToAsync(output, ct);
+                }
+                await output.FlushAsync(ct);
+                output.Flush(true);
+            }
+            if (!await MatchesAsync(partial, sha, file.Size, ct))
+            {
+                File.Delete(partial);
+                throw new ReleaseUpdateException("HASH_MISMATCH", file.Name + " failed assembled SHA-256 verification.",
+                    "Your game files were not changed. Contact the server admin.");
+            }
+            File.Move(partial, final, true);
+            return final;
         }
 
         for (int attempt = 0; attempt < 2; attempt++)

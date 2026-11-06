@@ -15,10 +15,10 @@ public partial class Form1 : Form
         Path.Combine(AppContext.BaseDirectory, "launcher_path.txt");
 
     private const string ManifestUrl =
-        "https://github.com/coopscollectionbiz-debug/coops-wow-launcher/releases/download/v0.2.0/manifest.json";
+        "https://github.com/coopscollectionbiz-debug/coops-wow-launcher/releases/download/v1.2.0/manifest.json";
 
     private const string PatchBaseUrl =
-        "https://github.com/coopscollectionbiz-debug/coops-wow-launcher/releases/download/v0.2.0/";
+        "https://github.com/coopscollectionbiz-debug/coops-wow-launcher/releases/download/v1.2.0/";
 
     private static readonly HttpClient Http = new HttpClient();
 
