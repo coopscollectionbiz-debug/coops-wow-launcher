@@ -2,15 +2,41 @@ namespace CoopsWoWLauncher;
 
 static class Program
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
-        ApplicationConfiguration.Initialize();
-        Application.Run(new Form1());
-    }    
+        if (LauncherHandoff.IsHelper(args))
+        {
+            LauncherHandoff.RunHelper(args);
+            return;
+        }
+
+        using Mutex instance = LauncherHandoff.InstanceMutex();
+        try
+        {
+            if (!instance.WaitOne(0)) return;
+        }
+        catch (AbandonedMutexException) { }
+
+        try
+        {
+            Action? checkpoint = LauncherHandoff.HealthCheckpoint(args);
+            if (checkpoint is null && !LauncherHandoff.RecoverOrContinue())
+                return;
+
+            ApplicationConfiguration.Initialize();
+            Application.Run(new Form1
+            {
+                StartupCheckpoint = checkpoint,
+#if STAGING_FEEDS
+                StagingSmoke = args is ["--staging-smoke", "update" or "graphics" or "graphics-install" or "graphics-remove"]
+                    ? args[1] : null,
+#endif
+            });
+        }
+        finally
+        {
+            instance.ReleaseMutex();
+        }
+    }
 }

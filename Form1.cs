@@ -23,6 +23,7 @@ public partial class Form1 : Form
     private static readonly HttpClient Http = new HttpClient();
 
     private readonly Label statusLabel;
+    private readonly ProgressBar downloadBar;
     private readonly Button browseButton;
     private readonly Button patchButton;
     private readonly Button launchButton;
@@ -41,7 +42,7 @@ public partial class Form1 : Form
 
         Text = "Coop's WoW Launcher";
         Width = 620;
-        Height = 290;
+        Height = 320;
         StartPosition = FormStartPosition.CenterScreen;
 
         statusLabel = new Label
@@ -52,11 +53,22 @@ public partial class Form1 : Form
             Height = 90
         };
 
+        downloadBar = new ProgressBar
+        {
+            Left = 30,
+            Top = 112,
+            Width = 540,
+            Height = 16,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            MarqueeAnimationSpeed = 30,
+            Visible = false
+        };
+
         browseButton = new Button
         {
             Text = "Choose WoW Folder",
             Left = 55,
-            Top = 140,
+            Top = 156,
             Width = 160,
             Height = 40
         };
@@ -65,7 +77,7 @@ public partial class Form1 : Form
         {
             Text = "Check / Install Patch",
             Left = 230,
-            Top = 140,
+            Top = 156,
             Width = 170,
             Height = 40
         };
@@ -74,7 +86,7 @@ public partial class Form1 : Form
         {
             Text = "Launch WoW",
             Left = 415,
-            Top = 140,
+            Top = 156,
             Width = 140,
             Height = 40
         };
@@ -84,9 +96,11 @@ public partial class Form1 : Form
         launchButton.Click += LaunchButton_Click;
 
         Controls.Add(statusLabel);
+        Controls.Add(downloadBar);
         Controls.Add(browseButton);
         Controls.Add(patchButton);
         Controls.Add(launchButton);
+        InitializePackageControls();
 
         LoadSavedPath();
         RefreshStatus();
@@ -96,10 +110,17 @@ public partial class Form1 : Form
 
     private async void Form1_Shown(object? sender, EventArgs e)
     {
-        if (!IsValidWowPath())
+#if STAGING_FEEDS
+        if (StagingSmoke is { } smoke)
+        {
+            await RunStagingSmokeAsync(smoke);
             return;
-
-        await CheckAndInstallPatchAsync();
+        }
+#endif
+        Task launcher = CheckLauncherAsync();
+        Task graphics = CheckLumenveilAsync();
+        Task patch = IsValidWowPath() ? CheckAndInstallPatchAsync() : Task.CompletedTask;
+        await Task.WhenAll(launcher, graphics, patch);
     }
 
     private bool IsValidWowPath()
@@ -175,8 +196,11 @@ public partial class Form1 : Form
             }
 
             wowPath = dialog.SelectedPath;
+            graphicsCompatible = false;
+            UpdatePackageButtons();
             SavePath();
             RefreshStatus();
+            _ = RefreshGraphicsClientAsync();
         }
     }
 
@@ -187,30 +211,46 @@ public partial class Form1 : Form
 
     private async Task CheckAndInstallPatchAsync()
     {
+        if (patchBusy || graphicsMutating)
+            return;
+
         if (!IsValidWowPath())
         {
             RefreshStatus();
             return;
         }
 
+        patchBusy = true;
+        UpdatePackageButtons();
+        browseButton.Enabled = false;
         patchButton.Enabled = false;
         launchButton.Enabled = false;
 
-        var progress = new Progress<string>(s => statusLabel.Text = s);
+        bool showProgress = true;
+        var progress = new Progress<string>(s =>
+        {
+            if (showProgress) ShowStatus(s);
+        });
+        IProgress<DownloadStatus> downloadProgress = new Progress<DownloadStatus>(s =>
+        {
+            if (showProgress) ShowDownloadStatus(s);
+        });
         var updater = new ReleaseUpdater(
             wowPath,
             new HttpPayloadSource(Http, PatchBaseUrl),
             LauncherVersion,
-            progress);
+            progress,
+            downloadProgress);
 
         bool releaseApplied = false;
+        string activeCategory = "Game patch";
 
         try
         {
             // Finish or undo an interrupted install first; works even when offline.
             RecoveryResult? recovery = await updater.RecoverInterruptedInstallAsync();
 
-            statusLabel.Text = "Checking for updates...";
+            ShowStatus("Checking for updates...");
 
             string manifestUrl =
                 ManifestUrl + "?t=" + DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -240,13 +280,18 @@ public partial class Form1 : Form
 
             int updated = release.Installed.Count;
 
-            foreach (UpdateFile file in manifest.Files)
+            activeCategory = "Addon";
+            var addons = manifest.Files.Where(file =>
+                file.Type.Equals("addon", StringComparison.OrdinalIgnoreCase) &&
+                !IsAddonCurrent(file)).ToList();
+            int queueCount = addons.Sum(file => file.DownloadCount);
+            int position = 1;
+            foreach (UpdateFile file in addons)
             {
-                if (file.Type.Equals("addon", StringComparison.OrdinalIgnoreCase) &&
-                    await InstallAddonAsync(file, updater))
-                {
+                var item = new DownloadItem(DownloadKind.Addon, file.SourceFile, position, queueCount);
+                if (await Task.Run(() => InstallAddonAsync(file, updater, item, downloadProgress)))
                     updated++;
-                }
+                position += file.DownloadCount;
             }
 
             string text = updated == 0 && !release.Changed
@@ -262,10 +307,13 @@ public partial class Form1 : Form
             if (release.Warnings.Count > 0)
                 text += "\nNote: " + string.Join("; ", release.Warnings);
 
-            statusLabel.Text = text;
+            showProgress = false;
+            ShowStatus(text);
         }
         catch (ReleaseUpdateException ex)
         {
+            showProgress = false;
+            ShowStatus($"{activeCategory} update failed.\n" + ex.Message.Split('\n')[0]);
             if (!releaseApplied)
                 releaseVerified = false;
 
@@ -274,11 +322,11 @@ public partial class Form1 : Form
                 "Update Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
-
-            statusLabel.Text = "Update check failed.\n" + ex.Message.Split('\n')[0];
         }
         catch (Exception ex)
         {
+            showProgress = false;
+            ShowStatus($"{activeCategory} update failed.");
             // Network and addon errors say nothing about the installed patch files.
             if (!releaseApplied && ex is not HttpRequestException and not TaskCanceledException)
                 releaseVerified = false;
@@ -289,41 +337,69 @@ public partial class Form1 : Form
                 "Update Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
-
-            statusLabel.Text = "Update check failed.";
         }
         finally
         {
+            patchBusy = false;
+            browseButton.Enabled = true;
             patchButton.Enabled = IsValidWowPath();
             launchButton.Enabled = IsValidWowPath();
+            UpdatePackageButtons();
         }
     }
 
-    private async Task<bool> InstallAddonAsync(UpdateFile file, ReleaseUpdater updater)
+    private void ShowStatus(string text)
     {
-        string destination = Path.Combine(
-            wowPath,
-            file.Destination.Replace('/', Path.DirectorySeparatorChar));
+        downloadBar.Visible = false;
+        statusLabel.Text = text;
+    }
 
-        string marker = Path.Combine(
-            destination,
-            ".coops-launcher-version");
+    private void ShowDownloadStatus(DownloadStatus status) => RenderProgress(statusLabel, downloadBar, status);
 
-        if (Directory.Exists(destination) && File.Exists(marker))
+    private static void RenderProgress(Label label, ProgressBar bar, DownloadStatus status)
+    {
+        DownloadItem item = status.Item;
+        if (status.Phase != DownloadPhase.Downloading)
         {
-            string installedVersion = File.ReadAllText(marker).Trim();
-
-            if (installedVersion.Equals(
-                file.Sha256,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
+            bar.Visible = false;
+            string phase = status.Phase == DownloadPhase.ReadyToRestart ? "Ready to restart" : status.Phase.ToString();
+            label.Text = $"{item.DisplayName}\n{phase} · {item.Filename}";
+            return;
         }
 
-        statusLabel.Text = $"Downloading {file.Name}...";
+        string queue = item.Count > 1 ? $" · File {item.Position} of {item.Count}" : "";
+        string text = $"{item.DisplayName}{queue}\nDownloading {item.Filename}";
+        label.Text = text + "\n" + status.TransferText;
+        if (status.Percent is int percent)
+        {
+            bar.Style = ProgressBarStyle.Continuous;
+            bar.Value = percent;
+        }
+        else
+        {
+            bar.Style = ProgressBarStyle.Marquee;
+        }
+        bar.Visible = true;
+    }
 
-        string zipFile = await updater.DownloadAndVerifyAsync(file);
+    private string AddonDestination(UpdateFile file) =>
+        Path.Combine(wowPath, file.Destination.Replace('/', Path.DirectorySeparatorChar));
+
+    private bool IsAddonCurrent(UpdateFile file)
+    {
+        string marker = Path.Combine(AddonDestination(file), ".coops-launcher-version");
+        return File.Exists(marker) &&
+            File.ReadAllText(marker).Trim().Equals(file.Sha256, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<bool> InstallAddonAsync(UpdateFile file, ReleaseUpdater updater, DownloadItem item,
+        IProgress<DownloadStatus> progress)
+    {
+        if (IsAddonCurrent(file))
+            return false;
+
+        string destination = AddonDestination(file);
+        string zipFile = await updater.DownloadAndVerifyAsync(file, item, default);
 
         string extractRoot = Path.Combine(
             Path.GetTempPath(),
@@ -331,6 +407,7 @@ public partial class Form1 : Form
 
         try
         {
+            progress.Report(new(item, DownloadPhase.Extracting));
             Directory.CreateDirectory(extractRoot);
 
             System.IO.Compression.ZipFile.ExtractToDirectory(
@@ -364,6 +441,7 @@ public partial class Form1 : Form
                 throw new InvalidDataException(
                     $"Invalid addon destination for {file.Name}.");
 
+            progress.Report(new(item, DownloadPhase.Installing));
             Directory.CreateDirectory(addonParent);
 
             string backup = destination + ".coops-launcher-old";

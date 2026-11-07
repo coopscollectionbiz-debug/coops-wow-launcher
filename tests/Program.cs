@@ -58,6 +58,10 @@ static class Tests
                 });
                 return;
             }
+            await Run("progress across fresh, resumed, restarted, unknown-length and failed transfers",
+                () => ProgressTests.TransferCases(Sandbox));
+            await Run("rolling speed decays on a stalled read and preserves all download categories",
+                ProgressTests.StallAndKinds);
             await Run("only evidence-qualified archives are optional",()=> {
                 var m=Manifest(); var expected=new[]{"Data/enus/backup-enus.mpq","Data/enus/base-enus.mpq","Data/enus/patch-enus-s.mpq"};
                 Check(m.RequiredBaseline.Where(b=>b.Optional).Select(b=>b.Path).Order().SequenceEqual(expected.Order()),"Unexpected optional policy");
@@ -184,10 +188,19 @@ static class Tests
                 f.Parts=chunks.Select((b,i)=>new PayloadPart {SourceFile="part"+i,Sha256=Hash(b),Size=b.Length}).ToList();
                 f.Size=chunks.Sum(b=>b.Length); f.Sha256=Hash(chunks.SelectMany(b=>b).ToArray());
                 foreach(var (p,i) in f.Parts.Select((p,i)=>(p,i))) source.Payloads[p.SourceFile]=chunks[i];
-                var u=new ReleaseUpdater(r,source,new Version(1,2,0));
+                var progress = new ProgressTests.Recorder();
+                var u=new ReleaseUpdater(r,source,new Version(1,2,0),downloadProgress:progress);
                 Write(r,ReleaseUpdater.StateDirName+"/staging/"+f.Parts[0].Sha256+".partial",chunks[0][..2]);
                 await u.ApplyAsync(m); Check(source.Offsets.Contains(("part0",2L)),"Partial download not resumed");
                 Check(Hash(File.ReadAllBytes(Full(r,f.Destination)))==f.Sha256,"Wrong assembly");
+                var queue = progress.States.Where(s => s.Phase == DownloadPhase.Downloading)
+                    .Select(s => s.Item).Distinct().ToArray();
+                Check(queue.SequenceEqual(new[] {
+                    new DownloadItem(DownloadKind.GamePatch, "part0", 1, 2),
+                    new DownloadItem(DownloadKind.GamePatch, "part1", 2, 2)
+                }), "Multipart download queue was incorrect.");
+                Check(progress.States.Any(s => s.Phase == DownloadPhase.Assembling) &&
+                    progress.States.Any(s => s.Phase == DownloadPhase.Installing), "Patch phases were missing.");
             });
             await Run("corrupt multipart data or assembled hash changes no client files",async()=> {
                 foreach(bool corruptPart in new[]{true,false}) {

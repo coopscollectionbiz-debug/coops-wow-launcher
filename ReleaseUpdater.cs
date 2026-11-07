@@ -50,6 +50,7 @@ public sealed class UpdateFile
     // Existing mismatched baseline files remain incompatible and are not replaced.
     public bool SuppliesBaseline { get; set; }
     public List<PayloadPart> Parts { get; set; } = new();
+    internal int DownloadCount => Math.Max(1, Parts.Count);
 }
 
 public sealed class PayloadPart
@@ -113,6 +114,7 @@ public sealed class PayloadResponse : IDisposable
 {
     public required Stream Stream { get; init; }
     public long StartOffset { get; init; }
+    public long? TotalBytes { get; init; }
     public Action? OnDispose { get; init; }
 
     public void Dispose()
@@ -153,14 +155,21 @@ public sealed class HttpPayloadSource : IPayloadSource
                 r.Content.Headers.ContentRange?.From == offset)
             {
                 Stream s = await r.Content.ReadAsStreamAsync(ct);
-                return new PayloadResponse { Stream = s, StartOffset = offset, OnDispose = r.Dispose };
+                return new PayloadResponse
+                {
+                    Stream = s, StartOffset = offset,
+                    TotalBytes = r.Content.Headers.ContentRange?.Length, OnDispose = r.Dispose
+                };
             }
 
             if (r.StatusCode == HttpStatusCode.OK)
             {
                 // Server ignored the Range header: use the full body from the start.
                 Stream s = await r.Content.ReadAsStreamAsync(ct);
-                return new PayloadResponse { Stream = s, StartOffset = 0, OnDispose = r.Dispose };
+                return new PayloadResponse
+                {
+                    Stream = s, TotalBytes = r.Content.Headers.ContentLength, OnDispose = r.Dispose
+                };
             }
 
             r.Dispose();
@@ -174,6 +183,7 @@ public sealed class HttpPayloadSource : IPayloadSource
         {
             Stream = body,
             StartOffset = 0,
+            TotalBytes = response.Content.Headers.ContentLength,
             OnDispose = () => { response.Dispose(); request.Dispose(); }
         };
     }
@@ -267,6 +277,7 @@ public sealed class ReleaseUpdater
     private readonly string root;
     private readonly IPayloadSource source;
     private readonly IProgress<string>? progress;
+    private readonly IProgress<DownloadStatus>? downloadProgress;
     private readonly Version launcherVersion;
 
     /// <summary>Test seam: invoked at named fault points during install.</summary>
@@ -275,12 +286,14 @@ public sealed class ReleaseUpdater
     /// <summary>Ignore the size/time cache and re-hash every baseline file.</summary>
     public bool ForceBaselineRehash { get; set; }
 
-    public ReleaseUpdater(string wowPath, IPayloadSource source, Version launcherVersion, IProgress<string>? progress = null)
+    public ReleaseUpdater(string wowPath, IPayloadSource source, Version launcherVersion,
+        IProgress<string>? progress = null, IProgress<DownloadStatus>? downloadProgress = null)
     {
         root = Path.GetFullPath(wowPath);
         this.source = source;
         this.launcherVersion = launcherVersion;
         this.progress = progress;
+        this.downloadProgress = downloadProgress;
     }
 
     public string StateDir => Path.Combine(root, StateDirName);
@@ -617,9 +630,13 @@ public sealed class ReleaseUpdater
         // Stage (download + verify) everything first; the client is untouched until all payloads verify.
         var staged = new Dictionary<UpdateFile, string>();
         var activationPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int queueCount = needed.Sum(n => n.File.DownloadCount);
+        int position = 1;
         foreach (var n in needed)
         {
-            string payload = await DownloadAndVerifyAsync(n.File, ct);
+            var item = new DownloadItem(DownloadKind.GamePatch, n.File.Name, position, queueCount);
+            string payload = await DownloadAndVerifyAsync(n.File, item, ct);
+            position += n.File.DownloadCount;
             if (!activationPaths.Add(payload))
             {
                 // Equal content can supply different destinations (global/locale
@@ -687,7 +704,7 @@ public sealed class ReleaseUpdater
                 string stagedFull = Abs(op.StagedPath!);
                 Fault("before-replace:" + op.Path);
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                Report($"Installing {op.Path}...");
+                ReportPhase(new(DownloadKind.GamePatch, Path.GetFileName(op.Path)), DownloadPhase.Installing);
 
                 if (op.HadOriginal)
                 {
@@ -815,7 +832,15 @@ public sealed class ReleaseUpdater
     }
 
     /// <summary>Download into the staging folder (resumable) and verify size + SHA-256.</summary>
-    public async Task<string> DownloadAndVerifyAsync(UpdateFile file, CancellationToken ct = default)
+    public Task<string> DownloadAndVerifyAsync(UpdateFile file, CancellationToken ct = default)
+    {
+        bool isAddon = file.Type.Equals("addon", StringComparison.OrdinalIgnoreCase);
+        var item = new DownloadItem(isAddon ? DownloadKind.Addon : DownloadKind.GamePatch,
+            isAddon ? file.SourceFile : file.Name, 1, file.DownloadCount);
+        return DownloadAndVerifyAsync(file, item, ct);
+    }
+
+    internal async Task<string> DownloadAndVerifyAsync(UpdateFile file, DownloadItem item, CancellationToken ct)
     {
         Directory.CreateDirectory(StagingDir);
         string sha = file.Sha256.ToLowerInvariant();
@@ -824,6 +849,7 @@ public sealed class ReleaseUpdater
 
         if (File.Exists(final))
         {
+            ReportPhase(item, DownloadPhase.Verifying);
             if (await MatchesAsync(final, sha, file.Size, ct))
                 return final;
             File.Delete(final);
@@ -834,14 +860,17 @@ public sealed class ReleaseUpdater
             // Use the same resumable SHA-256 downloader for every part. Nothing
             // reaches the client until all parts and the full assembled MPQ verify.
             var parts = new List<string>();
-            foreach (PayloadPart p in file.Parts)
+            for (int index = 0; index < file.Parts.Count; index++)
+            {
+                PayloadPart p = file.Parts[index];
                 parts.Add(await DownloadAndVerifyAsync(new UpdateFile
                 {
                     Name = p.SourceFile, SourceFile = p.SourceFile,
                     Sha256 = p.Sha256, Size = p.Size
-                }, ct));
+                }, item with { Filename = p.SourceFile, Position = item.Position + index }, ct));
+            }
             EnsureFreeSpace(file.Size ?? 0);
-            Report("Assembling and verifying " + file.Name + "...");
+            ReportPhase(item, DownloadPhase.Assembling);
             using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20, true))
             {
                 foreach (string part in parts)
@@ -852,6 +881,7 @@ public sealed class ReleaseUpdater
                 await output.FlushAsync(ct);
                 output.Flush(true);
             }
+            ReportPhase(item, DownloadPhase.Verifying);
             if (!await MatchesAsync(partial, sha, file.Size, ct))
             {
                 File.Delete(partial);
@@ -875,9 +905,10 @@ public sealed class ReleaseUpdater
             if (file.Size is null || have < file.Size)
             {
                 EnsureFreeSpace((file.Size ?? 0) - have);
-                Report(have > 0
-                    ? $"Resuming download of {file.Name} ({have / 1048576:N0} MB already downloaded)..."
-                    : $"Downloading {file.Name}...");
+                if (downloadProgress is null)
+                    Report($"Downloading {file.Name}...");
+                else
+                    downloadProgress.Report(new(item, DownloadPhase.Downloading, have, file.Size));
 
                 try
                 {
@@ -885,21 +916,8 @@ public sealed class ReleaseUpdater
                     bool append = have > 0 && resp.StartOffset == have;
                     using var fs = new FileStream(partial, append ? FileMode.Append : FileMode.Create,
                         FileAccess.Write, FileShare.None, 1 << 20, true);
-                    long done = append ? have : 0;
-                    byte[] buf = new byte[1 << 20];
-                    int read;
-                    DateTime last = DateTime.MinValue;
-                    while ((read = await resp.Stream.ReadAsync(buf, ct)) > 0)
-                    {
-                        await fs.WriteAsync(buf.AsMemory(0, read), ct);
-                        done += read;
-                        received += read;
-                        if (file.Size is long total && (DateTime.UtcNow - last).TotalMilliseconds > 250)
-                        {
-                            last = DateTime.UtcNow;
-                            Report($"Downloading {file.Name}: {done / 1048576:N0} / {total / 1048576:N0} MB");
-                        }
-                    }
+                    received = await DownloadTransfer.CopyAsync(resp.Stream, fs, item, append ? have : 0,
+                        file.Size ?? resp.TotalBytes, downloadProgress, ct);
                     await fs.FlushAsync(ct);
                     fs.Flush(true);
                 }
@@ -929,7 +947,7 @@ public sealed class ReleaseUpdater
                     "Your game files were not changed. Press Check / Install Patch to resume the download.");
             }
 
-            Report($"Verifying download of {file.Name}...");
+            ReportPhase(item, DownloadPhase.Verifying);
             if (await MatchesAsync(partial, sha, file.Size, ct))
             {
                 File.Move(partial, final, true);
@@ -946,6 +964,14 @@ public sealed class ReleaseUpdater
             $"{file.Name} failed SHA-256 verification; the downloaded file was discarded.",
             "Your game files were not changed. Press Check / Install Patch to try again. " +
             "If this keeps happening, the download server may be serving a damaged file; contact the server admin.");
+    }
+
+    private void ReportPhase(DownloadItem item, DownloadPhase phase)
+    {
+        if (downloadProgress is null)
+            Report($"{phase} {item.Filename}...");
+        else
+            downloadProgress.Report(new(item, phase));
     }
 
     public static async Task<string> Sha256Async(string path, CancellationToken ct = default)

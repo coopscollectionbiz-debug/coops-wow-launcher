@@ -6,10 +6,17 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.2.0</Version>
+    <Version Condition="'$(Version)' == ''">1.3.0</Version>
+    <DefineConstants Condition="'$(StagingFeeds)' == 'true'">$(DefineConstants);STAGING_FEEDS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <AssemblyMetadata Include="LauncherFeedKey" Value="$(LauncherFeedKey)" />
+    <AssemblyMetadata Include="LumenveilFeedKey" Value="$(LumenveilFeedKey)" />
+    <AssemblyMetadata Include="StagingFeeds" Value="$(StagingFeeds)" />
+    <AssemblyMetadata Include="LauncherFeedUrl" Value="$(LauncherFeedUrl)" />
+    <AssemblyMetadata Include="LumenveilFeedUrl" Value="$(LumenveilFeedUrl)" />
+    <AssemblyMetadata Include="FailStartup" Value="$(FailStartup)" />
   </ItemGroup>
 </Project>
