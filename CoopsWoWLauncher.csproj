@@ -7,6 +7,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Version Condition="'$(Version)' == ''">1.3.0</Version>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
     <DefineConstants Condition="'$(StagingFeeds)' == 'true'">$(DefineConstants);STAGING_FEEDS</DefineConstants>
   </PropertyGroup>
 

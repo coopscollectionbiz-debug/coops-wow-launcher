@@ -39,6 +39,8 @@ function Build([string]$Version, [string]$Destination, [switch]$FailStartup) {
         "-p:LauncherFeedUrl=$base/launcher.json", "-p:LumenveilFeedUrl=$base/lumenveil.json", '-p:NuGetAudit=false')
     & dotnet publish $project @options | Out-Host
     Assert ($LASTEXITCODE -eq 0) "Publish failed for $Version"
+    $published = @(Get-ChildItem -LiteralPath $Destination -File)
+    Assert ($published.Count -eq 1 -and $published[0].Name -eq 'CoopsWoWLauncher.exe') "Publish did not produce a standalone EXE for $Version"
 }
 
 function Write-Feed([string]$Channel, [string]$Version, [string]$Asset, [hashtable]$Extra = @{}, [switch]$BadSignature) {
