@@ -1,72 +1,254 @@
 {
   "name": "Lumenveil",
-  "version": "1.0.0",
-  "description": "Graphics files copied from the working C:\\WoWClient-Worgen-Test client (2026-11-08 snapshot).",
+  "version": "1.1.0",
+  "description": "Graphics files copied from the working C:\\WoWClient-Worgen-Test client (2026-11-08 snapshot), plus the ReShade 6.8.0.2157 runtime that client loads from C:\\ProgramData\\ReShade, set up as a client-local Vulkan layer.",
   "defaultSource": "C:\\WoWClient-Worgen-Test",
   "files": [
-    { "path": "version.dll", "role": "Lumenveil loader 0.1.1" },
-    { "path": "CoAVolFog.dll", "role": "Lumenveil renderer (live Worgen build)" },
-    { "path": "CoAVolFog.ini", "role": "Lumenveil settings" },
-    { "path": "CoAVolFog-regions.ini", "role": "Lumenveil per-zone presets" },
-    { "path": "lampdata.bin", "role": "Lumenveil lamp and window data (loaded at start)" },
-    { "path": "liquiddata.bin", "role": "Lumenveil water data (loaded at start)" },
-    { "path": "gameobjectlights.bin", "role": "Lumenveil game-object light data" },
-    { "path": "d3d9.dll", "role": "DXVK 3.1.1 x86" },
-    { "path": "dxvk.conf", "role": "DXVK configuration" },
+    {
+      "path": "version.dll",
+      "role": "Lumenveil loader 0.1.1"
+    },
+    {
+      "path": "CoAVolFog.dll",
+      "role": "Lumenveil renderer (live Worgen build)"
+    },
+    {
+      "path": "CoAVolFog.ini",
+      "role": "Lumenveil settings"
+    },
+    {
+      "path": "CoAVolFog-regions.ini",
+      "role": "Lumenveil per-zone presets"
+    },
+    {
+      "path": "lampdata.bin",
+      "role": "Lumenveil lamp and window data (loaded at start)"
+    },
+    {
+      "path": "liquiddata.bin",
+      "role": "Lumenveil water data (loaded at start)"
+    },
+    {
+      "path": "gameobjectlights.bin",
+      "role": "Lumenveil game-object light data"
+    },
+    {
+      "path": "d3d9.dll",
+      "role": "DXVK 3.1.1 x86"
+    },
+    {
+      "path": "dxvk.conf",
+      "role": "DXVK configuration"
+    },
     {
       "path": "ReShade.ini",
       "role": "ReShade configuration",
-      "removeLinesStartingWith": ["IntermediateCachePath="],
+      "removeLinesStartingWith": [
+        "IntermediateCachePath="
+      ],
       "adjustment": "Dropped IntermediateCachePath=C:\\Users\\Coop\\AppData\\Local\\Temp\\ReShade; ReShade then uses its default %TEMP%\\ReShade cache."
     },
-    { "path": "ReShade-Lumenveil.ini", "role": "ReShade preset" },
-    { "path": "reshade-shaders/Shaders/Curves.fx", "role": "ReShade effect" },
-    { "path": "reshade-shaders/Shaders/FakeHDR.fx", "role": "ReShade effect" },
-    { "path": "reshade-shaders/Shaders/Vibrance.fx", "role": "ReShade effect" },
-    { "path": "reshade-shaders/Shaders/Macros.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/ReShade.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/ReShadeUI.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_LAUNCHPAD.fx", "role": "ReShade effect" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_MXAO.fx", "role": "ReShade effect" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_SHARPEN.fx", "role": "ReShade effect" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_SMAA.fx", "role": "ReShade effect" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_bxdf.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_camera.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_colorspaces.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_debug.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_deferred.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_depth.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_fft.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_global.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_input.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_math.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_qmc.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_random.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_texture.fxh", "role": "ReShade header" },
-    { "path": "reshade-shaders/Textures/AreaLUT.png", "role": "ReShade texture" },
-    { "path": "reshade-shaders/Textures/iMMERSE_bluenoise.png", "role": "ReShade texture" },
-    { "path": "reshade-shaders/Textures/iMMERSE_rtgi_dict.png", "role": "ReShade texture" },
-    { "path": "Lumenveil/README.txt", "role": "Lumenveil notice" },
-    { "path": "Lumenveil/LICENSE.txt", "role": "Lumenveil licence" },
-    { "path": "Lumenveil/LEGAL.txt", "role": "Lumenveil notice" },
-    { "path": "Lumenveil/THIRD-PARTY-NOTICES.txt", "role": "Lumenveil notice" },
-    { "path": "Lumenveil/licenses/bzip2.txt", "role": "Third-party licence" },
-    { "path": "Lumenveil/licenses/DearImGui-MIT.txt", "role": "Third-party licence" },
-    { "path": "Lumenveil/licenses/Everwood-MIT.txt", "role": "Third-party licence" },
-    { "path": "Lumenveil/licenses/GPL-2.0.txt", "role": "Third-party licence" },
-    { "path": "Lumenveil/licenses/zlib.txt", "role": "Third-party licence" }
+    {
+      "path": "ReShade-Lumenveil.ini",
+      "role": "ReShade preset"
+    },
+    {
+      "path": "reshade-shaders/Shaders/Curves.fx",
+      "role": "ReShade effect"
+    },
+    {
+      "path": "reshade-shaders/Shaders/FakeHDR.fx",
+      "role": "ReShade effect"
+    },
+    {
+      "path": "reshade-shaders/Shaders/Vibrance.fx",
+      "role": "ReShade effect"
+    },
+    {
+      "path": "reshade-shaders/Shaders/Macros.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/ReShade.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/ReShadeUI.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_LAUNCHPAD.fx",
+      "role": "ReShade effect"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_MXAO.fx",
+      "role": "ReShade effect"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_SHARPEN.fx",
+      "role": "ReShade effect"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods_SMAA.fx",
+      "role": "ReShade effect"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_bxdf.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_camera.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_colorspaces.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_debug.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_deferred.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_depth.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_fft.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_global.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_input.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_math.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_qmc.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_random.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Shaders/iMMERSE/MartysMods/mmx_texture.fxh",
+      "role": "ReShade header"
+    },
+    {
+      "path": "reshade-shaders/Textures/AreaLUT.png",
+      "role": "ReShade texture"
+    },
+    {
+      "path": "reshade-shaders/Textures/iMMERSE_bluenoise.png",
+      "role": "ReShade texture"
+    },
+    {
+      "path": "reshade-shaders/Textures/iMMERSE_rtgi_dict.png",
+      "role": "ReShade texture"
+    },
+    {
+      "path": "Lumenveil/README.txt",
+      "role": "Lumenveil notice"
+    },
+    {
+      "path": "Lumenveil/LICENSE.txt",
+      "role": "Lumenveil licence"
+    },
+    {
+      "path": "Lumenveil/LEGAL.txt",
+      "role": "Lumenveil notice"
+    },
+    {
+      "path": "Lumenveil/THIRD-PARTY-NOTICES.txt",
+      "role": "Lumenveil notice"
+    },
+    {
+      "path": "Lumenveil/licenses/bzip2.txt",
+      "role": "Third-party licence"
+    },
+    {
+      "path": "Lumenveil/licenses/DearImGui-MIT.txt",
+      "role": "Third-party licence"
+    },
+    {
+      "path": "Lumenveil/licenses/Everwood-MIT.txt",
+      "role": "Third-party licence"
+    },
+    {
+      "path": "Lumenveil/licenses/GPL-2.0.txt",
+      "role": "Third-party licence"
+    },
+    {
+      "path": "Lumenveil/licenses/zlib.txt",
+      "role": "Third-party licence"
+    },
+    {
+      "path": "ReShade/ReShade32.dll",
+      "from": "C:\\ProgramData\\ReShade\\ReShade32.dll",
+      "role": "ReShade 6.8.0.2157 32-bit runtime (the exact DLL the Worgen client loads)"
+    },
+    {
+      "path": "ReShade/ReShade32.json",
+      "from": "C:\\ProgramData\\ReShade\\ReShade32.json",
+      "transform": "client-local-vulkan-layer",
+      "role": "Vulkan layer manifest for the client-local ReShade",
+      "adjustment": "Derived from the system ReShade32.json: layer renamed VK_LAYER_coops_reshade and its disable variable renamed, so it never collides with a system-wide ReShade install. The launcher enables it only for the WoW process it starts."
+    }
   ],
   "excluded": [
-    { "path": "ReShade32.dll (C:\\ProgramData\\ReShade)", "reason": "ReShade runs as a system-wide Vulkan layer registered by ReShade Setup, not from the client folder. The launcher's ReShade Vulkan setup button covers this step." },
-    { "path": "dinput8.dll, lexara.dll, skia.dll", "reason": "Lexara loader from St0ny's EXE patcher. Not part of the Lumenveil/DXVK/ReShade chain; the QA run reached Darkshire without them." },
-    { "path": "Lumenveil/lamp_extract.exe, Lumenveil-Setup.cmd, Lumenveil-Uninstall.cmd", "reason": "Data generator and manual setup scripts. The generated .bin files are shipped instead, and the launcher manages install and removal." },
-    { "path": "Lumenveil/setup-lamps.log, Lumenveil/setup-water.log, CoAVolFog.log, LuxVelum.log, ReShade.log, wow_d3d9.log", "reason": "Local logs" },
-    { "path": "CoAVolFog-draws/, CoAVolFog-draws.csv", "reason": "Draw-capture debug output" },
-    { "path": "CoAVolFog-spots/, CoAVolFog-spots.txt", "reason": "Personal saved camera spots and per-spot settings" },
-    { "path": "d3d9.dll.disabled, d3d9_dxvk.dll.pre-modern-disabled, dxvk.conf.disabled, GraphicsEffects.ini.*.bak", "reason": "Disabled or backup copies, not loaded" },
-    { "path": "dxvk/, DXVK-WoW-x86.zip", "reason": "Downloaded archives; only the extracted d3d9.dll is loaded" },
-    { "path": "Wow.exe, patcher_*.ini, St0nys-AIO-WoW-EXE-Patcher*", "reason": "Game executable and EXE-patcher state. The launcher never changes Wow.exe." },
-    { "path": "Data/, patch-*.mpq", "reason": "Game archives, including patch-z, are managed by the game manifest" },
-    { "path": "WTF/, Cache/, Logs/, Errors/, GameSessions/, Screenshots, *.png", "reason": "Account settings, caches, logs and screenshots" }
+    {
+      "path": "C:\\ProgramData\\ReShade\\ReShade64.dll, ReShadeApps.ini, HKLM Vulkan ImplicitLayers registration",
+      "reason": "System-wide ReShade install. WoW 3.3.5a is 32-bit and the package ships ReShade32.dll as a client-local layer instead, so no system change is needed."
+    },
+    {
+      "path": "dinput8.dll, lexara.dll, skia.dll",
+      "reason": "Lexara loader from St0ny's EXE patcher. Not part of the Lumenveil/DXVK/ReShade chain; the QA run reached Darkshire without them."
+    },
+    {
+      "path": "Lumenveil/lamp_extract.exe, Lumenveil-Setup.cmd, Lumenveil-Uninstall.cmd",
+      "reason": "Data generator and manual setup scripts. The generated .bin files are shipped instead, and the launcher manages install and removal."
+    },
+    {
+      "path": "Lumenveil/setup-lamps.log, Lumenveil/setup-water.log, CoAVolFog.log, LuxVelum.log, ReShade.log, wow_d3d9.log",
+      "reason": "Local logs"
+    },
+    {
+      "path": "CoAVolFog-draws/, CoAVolFog-draws.csv",
+      "reason": "Draw-capture debug output"
+    },
+    {
+      "path": "CoAVolFog-spots/, CoAVolFog-spots.txt",
+      "reason": "Personal saved camera spots and per-spot settings"
+    },
+    {
+      "path": "d3d9.dll.disabled, d3d9_dxvk.dll.pre-modern-disabled, dxvk.conf.disabled, GraphicsEffects.ini.*.bak",
+      "reason": "Disabled or backup copies, not loaded"
+    },
+    {
+      "path": "dxvk/, DXVK-WoW-x86.zip",
+      "reason": "Downloaded archives; only the extracted d3d9.dll is loaded"
+    },
+    {
+      "path": "Wow.exe, patcher_*.ini, St0nys-AIO-WoW-EXE-Patcher*",
+      "reason": "Game executable and EXE-patcher state. The launcher never changes Wow.exe."
+    },
+    {
+      "path": "Data/, patch-*.mpq",
+      "reason": "Game archives, including patch-z, are managed by the game manifest"
+    },
+    {
+      "path": "WTF/, Cache/, Logs/, Errors/, GameSessions/, Screenshots, *.png",
+      "reason": "Account settings, caches, logs and screenshots"
+    }
   ]
 }

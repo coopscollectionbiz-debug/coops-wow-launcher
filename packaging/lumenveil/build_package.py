@@ -22,15 +22,36 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def read_source(source: str, rel: str) -> bytes:
-    path = os.path.join(source, *rel.split("/"))
+LAYER_NAME = "VK_LAYER_coops_reshade"
+
+
+def source_path(source: str, item) -> str:
+    return item.get("from") or os.path.join(source, *item["path"].split("/"))
+
+
+def read_source(path: str) -> bytes:
     if os.path.islink(path) or not os.path.isfile(path):
         sys.exit(f"missing or linked source file: {path}")
     with open(path, "rb") as f:
         return f.read()
 
 
-def adjust(data: bytes, prefixes) -> bytes:
+def client_local_layer(data: bytes) -> bytes:
+    """Rename the system ReShade layer so a client-local copy never collides with a system install."""
+    manifest = json.loads(data.decode("utf-8-sig"))
+    layer = manifest["layer"]
+    if layer.get("name") != "VK_LAYER_reshade" or layer.get("library_path") != ".\\ReShade32.dll":
+        sys.exit("unexpected ReShade32.json layout")
+    layer["name"] = LAYER_NAME
+    layer["disable_environment"] = {"DISABLE_" + LAYER_NAME: "1"}
+    return (json.dumps(manifest, indent="\t") + "\n").replace("\n", "\r\n").encode("utf-8")
+
+
+def adjust(data: bytes, prefixes, transform=None) -> bytes:
+    if transform == "client-local-vulkan-layer":
+        return client_local_layer(data)
+    if transform:
+        sys.exit(f"unknown transform {transform}")
     if not prefixes:
         return data
     lines = data.splitlines(keepends=True)
@@ -61,10 +82,12 @@ def main():
     entries = []
     for item in sorted(spec["files"], key=lambda i: i["path"].lower()):
         rel = item["path"]
-        original = read_source(args.source, rel)
-        packaged = adjust(original, item.get("removeLinesStartingWith"))
+        src = source_path(args.source, item)
+        original = read_source(src)
+        packaged = adjust(original, item.get("removeLinesStartingWith"), item.get("transform"))
         entries.append({
             "path": rel,
+            "from": src,
             "role": item["role"],
             "sourceSha256": sha256(original),
             "sourceSize": len(original),
@@ -84,7 +107,7 @@ def main():
 
     # Re-read sources: the client must not have changed while packaging.
     for e in entries:
-        if sha256(read_source(args.source, e["path"])) != e["sourceSha256"]:
+        if sha256(read_source(e["from"])) != e["sourceSha256"]:
             sys.exit(f"source changed during packaging: {e['path']}")
 
     with open(zip_path, "rb") as f:
@@ -112,9 +135,9 @@ def main():
         "size": len(zip_bytes),
         "sha256": package_sha,
         "installationEnabled": True,
-        "supportedBuilds": ["WoW 3.3.5a (12340) Coop's client"],
+        "supportedBuilds": ["WoW 3.3.5a (12340), stock or St0ny-patched"],
         "compatibleWowSha256": [h.lower() for h in args.wow_sha256],
-        "prerequisites": ["ReShade 6.8 Vulkan layer for Wow.exe (ReShade Setup)"],
+        "prerequisites": ["Vulkan graphics driver", "Start WoW with this launcher's Launch button for ReShade"],
         "files": files,
     }
     with open(os.path.join(out, "feed-payload.unsigned.json"), "w", encoding="utf-8", newline="\n") as f:

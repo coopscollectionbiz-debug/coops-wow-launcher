@@ -1,3 +1,4 @@
+using System.Diagnostics;
 namespace CoopsWoWLauncher;
 
 public partial class Form1
@@ -44,22 +45,9 @@ public partial class Form1
         downloadGraphicsButton = SectionButton("Download Lumenveil", 158, 489, 151, DownloadLumenveilAsync);
         installGraphicsButton = SectionButton("Install", 317, 489, 82, InstallLumenveilAsync);
         removeGraphicsButton = SectionButton("Remove", 407, 489, 82, RemoveLumenveilAsync);
-        SectionButton("ReShade Vulkan setup", 30, 531, 180, ShowReShadeSetupAsync);
         launcherStatus.Text = "Launcher update";
         graphicsStatus.Text = "Optional Graphics\nLumenveil · checking availability";
         UpdatePackageButtons();
-    }
-
-    private Task ShowReShadeSetupAsync()
-    {
-        MessageBox.Show(this,
-            "For the Lumenveil preset that uses DXVK and ReShade, download the official setup from https://reshade.me/.\n\n" +
-            "Close WoW, run ReShade Setup, select the Wow.exe in the client folder you plan to use, and select Vulkan. " +
-            "WoW 3.3.5a uses the 32-bit Vulkan layer. Follow the setup prompts for that executable and install " +
-            "the effect packages listed in the Lumenveil prerequisites.\n\n" +
-            "ReShade Setup manages the system Vulkan layer. This launcher installs graphics files only in your selected WoW folder.",
-            "Optional ReShade Vulkan setup", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        return Task.CompletedTask;
     }
 
     private Label SectionLabel(int top, int height)
@@ -357,7 +345,13 @@ public partial class Form1
 
     private async Task RunStagingSmokeAsync(string mode)
     {
-        if (mode == "update")
+        if (mode == "launch")
+        {
+            var environment = await LumenveilInstaller.LaunchEnvironmentAsync(wowPath);
+            using Process? wow = await StartWowAsync();
+            LogStagingProgress($"Launched Wow.exe pid {wow?.Id} with ReShade layer {(environment.Count > 0 ? "enabled" : "absent")}");
+        }
+        else if (mode == "update")
         {
             await CheckLauncherAsync();
             await UpdateLauncherAsync();

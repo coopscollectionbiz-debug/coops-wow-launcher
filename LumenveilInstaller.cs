@@ -21,8 +21,61 @@ internal static class LumenveilInstaller
     {
         "version.dll", "d3d9.dll", "dxgi.dll", "dinput8.dll", "d3d9.ini", "dxvk.conf", "ReShade.ini",
         "ReShadePreset.ini", "ReShade-Lumenveil.ini", "CoAVolFog.dll", "CoAVolFog.ini",
-        "CoAVolFog-regions.ini", "CoAVolFog-spots.txt", "lampdata.bin", "liquiddata.bin", "gameobjectlights.bin"
+        "CoAVolFog-regions.ini", "CoAVolFog-spots.txt", "lampdata.bin", "liquiddata.bin", "gameobjectlights.bin",
+        LayerDll, LayerManifest
     };
+
+    // ReShade ships as a client-local explicit Vulkan layer. Nothing is registered system-wide: the launcher
+    // enables it only for the Wow.exe process it starts, and turns off a system-wide ReShade layer for that
+    // process so ReShade is never injected twice.
+    private const string LayerDirectory = "ReShade";
+    private const string LayerDll = LayerDirectory + "/ReShade32.dll";
+    private const string LayerManifest = LayerDirectory + "/ReShade32.json";
+    internal const string LayerName = "VK_LAYER_coops_reshade";
+
+    /// <summary>
+    /// Environment for starting Wow.exe with the installed client-local ReShade layer, or an empty map when the
+    /// package (or its layer) is not installed or the layer files no longer match what was installed.
+    /// </summary>
+    internal static async Task<Dictionary<string, string>> LaunchEnvironmentAsync(string client)
+    {
+        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (!HasState(client)) return environment;
+            string state = SafePath(client, StateName);
+            if (File.Exists(SafePath(state, "pending.json"))) return environment;
+            Receipt? receipt = Read<Receipt>(state, "installed.json");
+            if (receipt is null) return environment;
+            foreach (string path in new[] { LayerDll, LayerManifest })
+            {
+                InstalledFile? file = receipt.Files.FirstOrDefault(f => f.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
+                string full = SafePath(client, path);
+                if (file is null || !File.Exists(full) || !await MatchesAsync(full, file))
+                    return environment;
+            }
+            string layers = SafePath(client, LayerDirectory);
+            string? existing = Environment.GetEnvironmentVariable("VK_INSTANCE_LAYERS");
+            environment["VK_LAYER_PATH"] = layers;
+            environment["VK_ADD_LAYER_PATH"] = layers;
+            environment["VK_INSTANCE_LAYERS"] = string.IsNullOrEmpty(existing) ? LayerName : LayerName + ";" + existing;
+            environment["DISABLE_VK_LAYER_reshade_1"] = "1";
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException or UnauthorizedAccessException)
+        {
+            environment.Clear();
+        }
+        return environment;
+    }
+
+    /// <summary>DXVK, and with it Lumenveil and ReShade, needs the 32-bit Vulkan runtime from the graphics driver.</summary>
+    private static void EnsureVulkanRuntime()
+    {
+        string wow64 = Environment.GetFolderPath(Environment.SpecialFolder.SystemX86);
+        if (!string.IsNullOrEmpty(wow64) && !File.Exists(Path.Combine(wow64, "vulkan-1.dll")))
+            throw new IOException("Lumenveil needs a graphics driver with Vulkan support, and the 32-bit Vulkan runtime " +
+                "(vulkan-1.dll) was not found. Update your graphics driver, then install Lumenveil again.");
+    }
 
     internal static bool CanInstall(PackageMetadata package) => package.InstallationEnabled &&
         package.CompatibleWowSha256 is { Length: > 0 } &&
@@ -62,7 +115,7 @@ internal static class LumenveilInstaller
         if (!HasState(client)) return;
         string state = SafePath(client, StateName);
         if (!File.Exists(SafePath(state, "pending.json"))) return;
-        EnsureGameClosed();
+        EnsureGameClosed(client);
         using var gate = Lock(state);
         await RecoverAsync(client, state);
     }
@@ -72,7 +125,9 @@ internal static class LumenveilInstaller
     {
         if (!await IsCompatibleAsync(client, package))
             throw new InvalidDataException("This Wow.exe is outside the supported Lumenveil builds.");
-        EnsureGameClosed();
+        EnsureGameClosed(client);
+        if (package.Files.Contains(LayerDll, StringComparer.OrdinalIgnoreCase))
+            EnsureVulkanRuntime();
 
         string state = SafePath(client, StateName);
         Directory.CreateDirectory(state);
@@ -161,7 +216,7 @@ internal static class LumenveilInstaller
                 entry.ExtractToFile(target);
                 staged.Add(new(path, await ReleaseUpdater.Sha256Async(target)));
             }
-            EnsureGameClosed();
+            EnsureGameClosed(client);
             transaction = transaction with { Files = staged.ToArray(), Replaced = replace.ToArray(), Directories = directories };
             Write(state, "pending.json", transaction);
             progress.Report(new(item, DownloadPhase.Installing));
@@ -201,7 +256,7 @@ internal static class LumenveilInstaller
 
     internal static async Task<string[]> RemoveAsync(string client)
     {
-        EnsureGameClosed();
+        EnsureGameClosed(client);
         string state = SafePath(client, StateName);
         if (!Directory.Exists(state))
             return [];
@@ -263,7 +318,7 @@ internal static class LumenveilInstaller
                 preserved.Add(original.Path + " (your original is kept in " + StateName + "\\" + BackupName + ")");
             }
         }
-        EnsureGameClosed();
+        EnsureGameClosed(client);
 
         var transaction = new Transaction(Guid.NewGuid().ToString("N"), true, removable.ToArray(), restore.ToArray());
         string staging = SafePath(state, transaction.Id);
@@ -496,11 +551,20 @@ internal static class LumenveilInstaller
         File.Move(temp, path, true);
     }
 
-    private static void EnsureGameClosed()
+    // Only a WoW running from this client folder blocks a change. A process whose path cannot be read still blocks.
+    private static void EnsureGameClosed(string client)
     {
-        Process[] processes = Process.GetProcessesByName("Wow");
-        foreach (Process process in processes) process.Dispose();
-        if (processes.Length > 0)
-            throw new IOException("Close World of Warcraft before changing graphics files.");
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(client)) + Path.DirectorySeparatorChar;
+        foreach (Process process in Process.GetProcessesByName("Wow"))
+        {
+            using (process)
+            {
+                string? path = null;
+                try { path = process.MainModule?.FileName; }
+                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { }
+                if (path is null || path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    throw new IOException("Close World of Warcraft in this folder before changing graphics files.");
+            }
+        }
     }
 }

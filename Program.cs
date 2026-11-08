@@ -29,7 +29,7 @@ static class Program
             {
                 StartupCheckpoint = checkpoint,
 #if STAGING_FEEDS
-                StagingSmoke = args is ["--staging-smoke", "update" or "graphics" or "graphics-install" or "graphics-remove"]
+                StagingSmoke = args is ["--staging-smoke", "update" or "graphics" or "graphics-install" or "graphics-remove" or "launch"]
                     ? args[1] : null,
 #endif
             });

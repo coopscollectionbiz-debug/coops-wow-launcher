@@ -488,7 +488,7 @@ public partial class Form1 : Form
         }
     }
 
-    private void LaunchButton_Click(object? sender, EventArgs e)
+    private async void LaunchButton_Click(object? sender, EventArgs e)
     {
         string exe = Path.Combine(wowPath, "Wow.exe");
 
@@ -514,11 +514,30 @@ public partial class Form1 : Form
                 return;
         }
 
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = exe,
-            WorkingDirectory = wowPath,
-            UseShellExecute = true
-        });
+            await StartWowAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("World of Warcraft could not be started.\n" + ex.Message);
+        }
+    }
+
+    // Starts Wow.exe. With the optional Lumenveil package installed, the process also gets the environment that
+    // enables its client-local ReShade layer; without it, WoW starts exactly as before.
+    internal async Task<Process?> StartWowAsync()
+    {
+        string client = wowPath;
+        Dictionary<string, string> environment = await LumenveilInstaller.LaunchEnvironmentAsync(client);
+        var start = new ProcessStartInfo
+        {
+            FileName = Path.Combine(client, "Wow.exe"),
+            WorkingDirectory = client,
+            UseShellExecute = environment.Count == 0
+        };
+        foreach (var (name, value) in environment)
+            start.Environment[name] = value;
+        return Process.Start(start);
     }
 }

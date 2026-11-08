@@ -4,7 +4,7 @@
 //
 // dotnet run --project tests/graphics-package -- --output <new dir> --client <disposable client>
 //     --package <dir with Lumenveil-<v>.zip and package-manifest.json> [--source C:\WoWClient-Worgen-Test]
-//     [--skip-self-update]
+//     [--skip-self-update] [--no-plant] [--launch]
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
@@ -25,13 +25,14 @@ string original = @"C:\WoWClient-Worgen-Test";
 Assert(!client.Equals(original, StringComparison.OrdinalIgnoreCase) &&
     !client.StartsWith(original + "\\", StringComparison.OrdinalIgnoreCase), "Choose a separate disposable client");
 Assert((File.GetAttributes(client) & FileAttributes.ReparsePoint) == 0, "Disposable client may not be a link");
-Assert(Process.GetProcessesByName("Wow").Length == 0, "Close WoW first");
+Assert(!ClientWowRunning(client), "Close WoW in the disposable client first");
 
 var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(packageDir, "package-manifest.json")))!;
 string version = (string)manifest["version"]!;
 string zipName = (string)manifest["package"]!["filename"]!;
 var files = manifest["files"]!.AsArray().Select(f => new PackagedFile(
-    (string)f!["path"]!, (string)f["sourceSha256"]!, (string)f["packagedSha256"]!, f["adjustment"] is not null)).ToList();
+    (string)f!["path"]!, (string)f["sourceSha256"]!, (string)f["packagedSha256"]!, f["adjustment"] is not null,
+    (string?)f["from"] ?? Path.Combine(source, (string)f["path"]!))).ToList();
 
 Directory.CreateDirectory(root);
 string feed = Directory.CreateDirectory(Path.Combine(root, "feed")).FullName;
@@ -51,7 +52,7 @@ using (var archive = ZipFile.OpenRead(zipPath))
         var entry = archive.GetEntry(f.Path) ?? throw new Exception("ZIP lacks " + f.Path);
         using var s = entry.Open();
         Assert(Hex(SHA256.HashData(s)) == f.Packaged.ToUpperInvariant(), "ZIP bytes differ for " + f.Path);
-        string live = Sha(Path.Combine(source, f.Path));
+        string live = Sha(f.From);
         Assert(live == f.Source.ToUpperInvariant(), "Worgen source changed since packaging: " + f.Path);
         Assert(f.Adjusted || f.Source.Equals(f.Packaged, StringComparison.OrdinalIgnoreCase), "Unexplained difference for " + f.Path);
     }
@@ -60,7 +61,7 @@ Pass($"{files.Count} packaged files match the manifest and the live Worgen sourc
 
 // 2. Player files that the package replaces: plant distinct ones where the client has none.
 var planted = new List<string>();
-foreach (string name in new[] { "d3d9.dll", "dxvk.conf" })
+foreach (string name in opts.ContainsKey("no-plant") ? Array.Empty<string>() : new[] { "d3d9.dll", "dxvk.conf" })
 {
     string p = Path.Combine(client, name);
     if (!File.Exists(p)) { File.WriteAllText(p, "player-owned " + name + " " + Guid.NewGuid()); planted.Add(name); }
@@ -90,7 +91,7 @@ try
         ["installationEnabled"] = true,
         ["compatibleWowSha256"] = new JsonArray(wowHash.ToLowerInvariant()),
         ["supportedBuilds"] = new JsonArray("Disposable test fingerprint"),
-        ["prerequisites"] = new JsonArray("ReShade 6.8 Vulkan layer for Wow.exe (ReShade Setup)"),
+        ["prerequisites"] = new JsonArray("Vulkan graphics driver", "Start WoW with this launcher's Launch button for ReShade"),
         ["files"] = new JsonArray(files.Select(f => (JsonNode)f.Path).ToArray()),
     });
 
@@ -166,15 +167,19 @@ try
         string state = Path.Combine(client, ".coops-lumenveil");
         string id = Guid.NewGuid().ToString("N");
         var receipt = JsonNode.Parse(File.ReadAllText(Path.Combine(state, "installed.json")))!;
-        var origin = receipt["replaced"]!.AsArray().First(r => (string)r!["path"]! == "d3d9.dll")!;
+        // With a player original for d3d9.dll it is already restored; on a clean client only the package file moved.
+        var origin = (receipt["replaced"]?.AsArray() ?? []).FirstOrDefault(r => (string)r!["path"]! == "d3d9.dll");
         var pkg = receipt["files"]!.AsArray().First(r => (string)r!["path"]! == "d3d9.dll")!;
-        Directory.CreateDirectory(Path.Combine(state, id));
+        var pkg2 = receipt["files"]!.AsArray().First(r => (string)r!["path"]! == "ReShade/ReShade32.dll")!;
+        Directory.CreateDirectory(Path.Combine(state, id, "ReShade"));
         File.Move(Path.Combine(client, "d3d9.dll"), Path.Combine(state, id, "d3d9.dll"));
-        File.Move(Path.Combine(state, "backup", "d3d9.dll"), Path.Combine(client, "d3d9.dll"));
+        File.Move(Path.Combine(client, "ReShade", "ReShade32.dll"), Path.Combine(state, id, "ReShade", "ReShade32.dll"));
+        if (origin is not null)
+            File.Move(Path.Combine(state, "backup", "d3d9.dll"), Path.Combine(client, "d3d9.dll"));
         File.WriteAllText(Path.Combine(state, "pending.json"), new JsonObject
         {
-            ["id"] = id, ["removing"] = true, ["files"] = new JsonArray(pkg.DeepClone()),
-            ["replaced"] = new JsonArray(origin.DeepClone())
+            ["id"] = id, ["removing"] = true, ["files"] = new JsonArray(pkg.DeepClone(), pkg2.DeepClone()),
+            ["replaced"] = origin is null ? new JsonArray() : new JsonArray(origin.DeepClone())
         }.ToJsonString());
         Smoke(NewRun("interrupted removal"), "graphics");
         Assert(!File.Exists(Path.Combine(state, "pending.json")), "Interrupted removal was not recovered");
@@ -184,6 +189,9 @@ try
         CompareSnapshots(before, Snapshot(client), "removal after interrupted removal");
         Pass("interrupted removal rolled back to the installed state on next launch; a later removal completed cleanly");
     }
+
+    if (opts.ContainsKey("launch"))
+        LaunchCheck();
 
     Assert(Sha(wow) == wowHash, "Wow.exe changed");
     Assert(!File.Exists(patchZ) || Sha(patchZ) == patchZHash, "Data/patch-z.mpq changed");
@@ -227,6 +235,109 @@ finally
     File.WriteAllLines(Path.Combine(root, "graphics-package-smoke.txt"), report);
 }
 Console.WriteLine("ALL PASS");
+
+// Installs through the launcher, starts WoW through the launcher's Launch path, and checks what actually loaded.
+void LaunchCheck()
+{
+    Smoke(NewRun("install before launch"), "graphics-install");
+    VerifyInstalled();
+    var preLaunch = Snapshot(client);
+    var launch = NewRun("launch");
+    var started = DateTime.Now.AddSeconds(-2);
+    Smoke(launch, "launch");
+    string line = File.ReadAllText(launch.Log);
+    var m = Regex.Match(line, @"pid (\d+) with ReShade layer (\w+)");
+    Assert(m.Success && m.Groups[2].Value == "enabled", "Launcher did not start WoW with the ReShade layer: " + line);
+    int pid = int.Parse(m.Groups[1].Value);
+    var evidence = new List<string>();
+    try
+    {
+        string reshadeLog = Path.Combine(client, "ReShade.log");
+        string fogLog = Path.Combine(client, "CoAVolFog.log");
+        string dxvkLog = Path.Combine(client, "wow_d3d9.log");
+        string localReshade = Path.Combine(client, "ReShade", "ReShade32.dll");
+        WaitUntil(() => Fresh(reshadeLog, started) && ReadShared(reshadeLog).Contains("vkCreateSwapchainKHR"), "ReShade swapchain in ReShade.log");
+        WaitUntil(() => Fresh(fogLog, started) && ReadShared(fogLog).Contains("CoAVolFog loaded from"), "CoAVolFog.log start line");
+        WaitUntil(() => Fresh(dxvkLog, started) && ReadShared(dxvkLog).Contains("D3D9DeviceEx"), "DXVK device in wow_d3d9.log");
+        Thread.Sleep(8000); // let effects compile and a few frames present
+        Assert(Process.GetProcessesByName("Wow").Any(p => p.Id == pid), "WoW exited during the launch check");
+        string rs = ReadShared(reshadeLog);
+        string first = rs.Split('\n').First(l => l.Contains("Initializing crosire's ReShade"));
+        Assert(first.Contains($"loaded from '{localReshade}'"), "ReShade did not load from the client folder: " + first);
+        Assert(!rs.Contains(@"C:\ProgramData\ReShade"), "A system-wide ReShade was also injected");
+        Assert(Regex.Matches(rs, "Initializing crosire's ReShade").Count == 1, "ReShade initialised more than once");
+        string shaders = Path.Combine(client, "reshade-shaders", "Shaders");
+        foreach (string fx in new[] { "MartysMods_LAUNCHPAD.fx", "MartysMods_SMAA.fx", "FakeHDR.fx", "Curves.fx", "MartysMods_SHARPEN.fx" })
+            Assert(rs.Split('\n').Any(l => l.Contains("Successfully compiled '" + shaders) && l.Contains(fx + "'")),
+                "Preset effect not compiled: " + fx);
+        var fog = ReadShared(fogLog).Split('\n').Where(l => l.Contains("loaded from") || l.Contains("lamp data") || l.Contains("liquid data"))
+            .Select(l => l.Trim()).ToList();
+        Assert(fog.Any(l => l.Contains("CoAVolFog loaded from " + client)), "CoAVolFog did not load from the client");
+        Assert(fog.Any(l => l.Contains("lamp data")) && fog.Any(l => l.Contains("liquid data")), "Lumenveil data files were not loaded");
+        var modules = Modules(pid);
+        foreach (string expect in new[] { @"\version.dll", @"\CoAVolFog.dll", @"\d3d9.dll", @"\ReShade\ReShade32.dll" })
+            Assert(modules.Any(x => x.EndsWith(expect, StringComparison.OrdinalIgnoreCase) && x.StartsWith(client, StringComparison.OrdinalIgnoreCase)),
+                "Module not loaded from the client: " + expect + "\n" + string.Join("\n", modules));
+        Assert(!modules.Any(x => x.Contains(@"\ProgramData\ReShade\", StringComparison.OrdinalIgnoreCase)), "System ReShade module loaded");
+        evidence.Add(first.Trim());
+        evidence.AddRange(fog.Take(4));
+        evidence.Add("DXVK: " + ReadShared(dxvkLog).Split('\n').First().Trim());
+        evidence.AddRange(modules.Where(x => x.StartsWith(client, StringComparison.OrdinalIgnoreCase)).Select(x => "module " + x));
+        evidence.Add($"ReShade compiled {Regex.Matches(rs, "Successfully compiled").Count} effects; ERROR lines: {Regex.Matches(rs, @"\| ERROR \|").Count}");
+    }
+    finally
+    {
+        try { using var wowProcess = Process.GetProcessById(pid); wowProcess.Kill(); wowProcess.WaitForExit(15000); } catch { }
+        WaitUntil(() => !ClientWowRunning(client), "the test WoW to exit");
+        File.WriteAllLines(Path.Combine(root, "launch-evidence.txt"), evidence);
+    }
+    foreach (string e in evidence) Console.WriteLine("  " + e);
+    Pass("launcher started WoW: version.dll, CoAVolFog.dll, DXVK d3d9.dll and client-local ReShade32.dll loaded; preset effects compiled; no system ReShade");
+
+    // What the game itself writes while running belongs to the player (logs, cache, config). Everything else must match.
+    var afterRun = Snapshot(client);
+    var runtime = new Regex(@"^(Logs|Cache|WTF|Errors|Screenshots)\\|^(ReShade\.log\d*|CoAVolFog\.log|wow_d3d9\.log|LuxVelum\.log|Lexara\.log)$", RegexOptions.IgnoreCase);
+    var changed = preLaunch.Keys.Union(afterRun.Keys, StringComparer.OrdinalIgnoreCase)
+        .Where(k => preLaunch.GetValueOrDefault(k) != afterRun.GetValueOrDefault(k)).OrderBy(k => k).ToList();
+    File.WriteAllLines(Path.Combine(root, "launch-runtime-changes.txt"), changed);
+    var unexpected = changed.Where(k => !runtime.IsMatch(k)).ToList();
+    Assert(unexpected.Count == 0, "Game launch changed managed or unrelated files:\n" + string.Join("\n", unexpected));
+
+    Smoke(NewRun("remove after launch"), "graphics-remove");
+    var afterRemove = Snapshot(client);
+    var remaining = before.Keys.Union(afterRemove.Keys, StringComparer.OrdinalIgnoreCase)
+        .Where(k => before.GetValueOrDefault(k) != afterRemove.GetValueOrDefault(k) && !runtime.IsMatch(k)).ToList();
+    Assert(remaining.Count == 0, "Removal after a game launch left differences:\n" + string.Join("\n", remaining));
+    Pass($"after the game ran, removal restored every package path and player file ({changed.Count} game-written log/cache/config entries kept)");
+}
+
+static string ReadShared(string path)
+{
+    using var s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+    using var r = new StreamReader(s);
+    return r.ReadToEnd();
+}
+
+// Only WoW started from the disposable client counts; a game the user is playing elsewhere is left alone.
+static bool ClientWowRunning(string dir) => Process.GetProcessesByName("Wow").Any(p =>
+{
+    try { return p.MainModule?.FileName.StartsWith(dir + "\\", StringComparison.OrdinalIgnoreCase) ?? true; }
+    catch { return true; }
+});
+
+static bool Fresh(string path, DateTime since) => File.Exists(path) && File.GetLastWriteTime(path) >= since;
+
+// Module paths of the 32-bit WoW process, read by 32-bit Windows PowerShell.
+static List<string> Modules(int pid)
+{
+    var ps = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.SystemX86), "WindowsPowerShell", "v1.0", "powershell.exe"))
+        { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+    foreach (string a in new[] { "-NoProfile", "-Command", $"(Get-Process -Id {pid}).Modules | ForEach-Object FileName" }) ps.ArgumentList.Add(a);
+    using var q = Process.Start(ps)!;
+    var paths = q.StandardOutput.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    q.WaitForExit();
+    return paths;
+}
 
 void VerifyInstalled()
 {
@@ -369,5 +480,5 @@ static Dictionary<string, string> ParseArgs(string[] a)
     return d;
 }
 
-record PackagedFile(string Path, string Source, string Packaged, bool Adjusted);
+record PackagedFile(string Path, string Source, string Packaged, bool Adjusted, string From);
 record Run(string Folder, string Exe, string Settings, string SettingsText, string Log, string State);
