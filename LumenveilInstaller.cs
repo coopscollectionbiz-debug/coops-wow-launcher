@@ -8,15 +8,20 @@ namespace CoopsWoWLauncher;
 internal static class LumenveilInstaller
 {
     private const string StateName = ".coops-lumenveil";
+    private const string BackupName = "backup";
     private const long MaxExpandedBytes = 1024L * 1024 * 1024;
     private sealed record InstalledFile(string Path, string Sha256);
-    private sealed record Receipt(string Transaction, string Version, string PackageSha256, InstalledFile[] Files);
-    private sealed record Transaction(string Id, bool Removing, InstalledFile[] Files);
+    // Replaced: player files moved to .coops-lumenveil/backup before a package file took their place.
+    // Directories: folders the install created, removed again when they are empty.
+    private sealed record Receipt(string Transaction, string Version, string PackageSha256, InstalledFile[] Files,
+        InstalledFile[]? Replaced = null, string[]? Directories = null);
+    private sealed record Transaction(string Id, bool Removing, InstalledFile[] Files,
+        InstalledFile[]? Replaced = null, string[]? Directories = null);
     private static readonly HashSet<string> RootFiles = new(StringComparer.OrdinalIgnoreCase)
     {
         "version.dll", "d3d9.dll", "dxgi.dll", "dinput8.dll", "d3d9.ini", "dxvk.conf", "ReShade.ini",
         "ReShadePreset.ini", "ReShade-Lumenveil.ini", "CoAVolFog.dll", "CoAVolFog.ini",
-        "CoAVolFog-regions.ini", "CoAVolFog-spots.txt"
+        "CoAVolFog-regions.ini", "CoAVolFog-spots.txt", "lampdata.bin", "liquiddata.bin", "gameobjectlights.bin"
     };
 
     internal static bool CanInstall(PackageMetadata package) => package.InstallationEnabled &&
@@ -36,6 +41,21 @@ internal static class LumenveilInstaller
 
     internal static bool HasState(string client) =>
         Directory.Exists(client) && Directory.Exists(Path.Combine(client, StateName));
+
+    /// <summary>The installed package version, or null when no Lumenveil files are managed in this client.</summary>
+    internal static string? InstalledVersion(string client)
+    {
+        try
+        {
+            if (!HasState(client)) return null;
+            Receipt? receipt = Read<Receipt>(SafePath(client, StateName), "installed.json");
+            return receipt?.Files.Length > 0 ? receipt.Version : null;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     internal static async Task RecoverIfNeededAsync(string client)
     {
@@ -72,26 +92,60 @@ internal static class LumenveilInstaller
         using var archive = ZipFile.OpenRead(zip);
         var entries = Inspect(archive, package.Files);
         var owned = (receipt?.Files ?? []).ToDictionary(f => f.Path, StringComparer.OrdinalIgnoreCase);
+        var replacedBefore = (receipt?.Replaced ?? []).ToDictionary(f => f.Path, StringComparer.OrdinalIgnoreCase);
         var missing = new List<(string Path, ZipArchiveEntry Entry)>();
+        var replace = new List<InstalledFile>();
         var conflicts = new List<string>();
         foreach (var (path, entry) in entries)
         {
             string dest = SafePath(client, path);
-            if (Directory.Exists(dest) || File.Exists(dest) &&
-                (!owned.TryGetValue(path, out var original) || !await MatchesAsync(dest, original)))
+            if (Directory.Exists(dest))
                 conflicts.Add(path);
-            else if (!File.Exists(dest))
+            else if (owned.TryGetValue(path, out var installed))
+            {
+                // Already installed by this package: keep it, unless the player edited it.
+                if (!File.Exists(dest))
+                    missing.Add((path, entry));
+                else if (!await MatchesAsync(dest, installed))
+                    conflicts.Add(path + " (edited after installation)");
+            }
+            else if (File.Exists(dest))
+            {
+                if (replacedBefore.ContainsKey(path) || File.Exists(SafePath(state, BackupName + "/" + path)))
+                    conflicts.Add(path + " (an earlier backup is still kept in " + StateName + "\\" + BackupName + ")");
+                else
+                {
+                    replace.Add(new(path, await ReleaseUpdater.Sha256Async(dest)));
+                    missing.Add((path, entry));
+                }
+            }
+            else
                 missing.Add((path, entry));
         }
         // A different wrapper can conflict even when its filename is outside the archive.
-        foreach (string wrapper in new[] { "d3d9.dll", "dxgi.dll", "dinput8.dll", "opengl32.dll",
-            "ReShade32.dll", "ReShade.ini", "dxvk.conf", "version.dll", "CoAVolFog.dll", "CoAVolFog.ini" })
+        foreach (string wrapper in new[] { "d3d9.dll", "dxgi.dll", "opengl32.dll", "ReShade32.dll",
+            "ReShade.ini", "dxvk.conf", "version.dll", "CoAVolFog.dll", "CoAVolFog.ini" })
         {
             if (!entries.ContainsKey(wrapper) && !owned.ContainsKey(wrapper) && File.Exists(SafePath(client, wrapper)))
                 conflicts.Add(wrapper);
         }
         if (conflicts.Count > 0)
             throw new IOException("Resolve these existing graphics files before installing Lumenveil:\n" + string.Join("\n", conflicts));
+
+        // Folders this install creates, deepest first, so removal can take them away again.
+        var created = new List<string>();
+        foreach (var (path, _) in missing)
+        {
+            for (string? dir = Path.GetDirectoryName(path.Replace('/', Path.DirectorySeparatorChar));
+                 !string.IsNullOrEmpty(dir); dir = Path.GetDirectoryName(dir))
+            {
+                string relative = dir.Replace(Path.DirectorySeparatorChar, '/');
+                if (!Directory.Exists(SafePath(client, relative)) &&
+                    !created.Contains(relative, StringComparer.OrdinalIgnoreCase))
+                    created.Add(relative);
+            }
+        }
+        string[] directories = created.OrderByDescending(d => d.Count(c => c == '/')).ToArray();
 
         var transaction = new Transaction(Guid.NewGuid().ToString("N"), false, []);
         string staging = SafePath(state, transaction.Id);
@@ -108,9 +162,19 @@ internal static class LumenveilInstaller
                 staged.Add(new(path, await ReleaseUpdater.Sha256Async(target)));
             }
             EnsureGameClosed();
-            transaction = transaction with { Files = staged.ToArray() };
+            transaction = transaction with { Files = staged.ToArray(), Replaced = replace.ToArray(), Directories = directories };
             Write(state, "pending.json", transaction);
             progress.Report(new(item, DownloadPhase.Installing));
+            foreach (var original in replace)
+            {
+                string dest = SafePath(client, original.Path);
+                if (!await MatchesAsync(dest, original))
+                    throw new IOException("A graphics file changed during installation: " + original.Path);
+                string backup = SafePath(state, BackupName + "/" + original.Path);
+                Directory.CreateDirectory(Path.GetDirectoryName(backup)!);
+                File.Move(dest, backup);
+                replacedBefore[original.Path] = original;
+            }
             foreach (var file in staged)
             {
                 string dest = SafePath(client, file.Path);
@@ -119,7 +183,10 @@ internal static class LumenveilInstaller
                 owned[file.Path] = file;
             }
 
-            Write(state, "installed.json", new Receipt(transaction.Id, package.Version, package.Sha256, owned.Values.ToArray()));
+            string[] allDirectories = (receipt?.Directories ?? []).Concat(directories)
+                .Distinct(StringComparer.OrdinalIgnoreCase).OrderByDescending(d => d.Count(c => c == '/')).ToArray();
+            Write(state, "installed.json", new Receipt(transaction.Id, package.Version, package.Sha256,
+                owned.Values.ToArray(), replacedBefore.Values.ToArray(), allDirectories));
             Finish(state, transaction);
         }
         catch
@@ -138,11 +205,28 @@ internal static class LumenveilInstaller
         string state = SafePath(client, StateName);
         if (!Directory.Exists(state))
             return [];
-        using var gate = Lock(state);
+        string[] preserved;
+        bool clean;
+        using (var gate = Lock(state))
+        {
+            (preserved, clean) = await RemoveLockedAsync(client, state);
+        }
+        // Leave no launcher state behind once every file and backup is back in place.
+        if (clean)
+        {
+            try { Directory.Delete(state, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return preserved;
+    }
+
+    private static async Task<(string[] Preserved, bool Clean)> RemoveLockedAsync(string client, string state)
+    {
         await RecoverAsync(client, state);
         Receipt? receipt = Read<Receipt>(state, "installed.json");
         if (receipt is null)
-            return [];
+            return ([], !Directory.Exists(SafePath(state, BackupName)));
 
         var removable = new List<InstalledFile>();
         var preserved = new List<string>();
@@ -160,9 +244,28 @@ internal static class LumenveilInstaller
                     preserved.Add(file.Path);
             }
         }
+        // Restore a backup only where the package file is about to be removed or is already gone.
+        var restore = new List<InstalledFile>();
+        var kept = new List<InstalledFile>();
+        foreach (var original in receipt.Replaced ?? [])
+        {
+            ValidateGraphicsPath(original.Path);
+            string backup = SafePath(state, BackupName + "/" + original.Path);
+            if (!File.Exists(backup))
+                continue;
+            bool freed = removable.Any(f => f.Path.Equals(original.Path, StringComparison.OrdinalIgnoreCase)) ||
+                !File.Exists(SafePath(client, original.Path)) && !Directory.Exists(SafePath(client, original.Path));
+            if (freed && await MatchesAsync(backup, original))
+                restore.Add(original);
+            else
+            {
+                kept.Add(original);
+                preserved.Add(original.Path + " (your original is kept in " + StateName + "\\" + BackupName + ")");
+            }
+        }
         EnsureGameClosed();
 
-        var transaction = new Transaction(Guid.NewGuid().ToString("N"), true, removable.ToArray());
+        var transaction = new Transaction(Guid.NewGuid().ToString("N"), true, removable.ToArray(), restore.ToArray());
         string staging = SafePath(state, transaction.Id);
         Write(state, "pending.json", transaction);
         try
@@ -176,18 +279,42 @@ internal static class LumenveilInstaller
                     continue;
                 }
 
-                string backup = SafePath(staging, file.Path);
-                Directory.CreateDirectory(Path.GetDirectoryName(backup)!);
-                File.Move(dest, backup);
+                string moved = SafePath(staging, file.Path);
+                Directory.CreateDirectory(Path.GetDirectoryName(moved)!);
+                File.Move(dest, moved);
             }
-            Write(state, "installed.json", new Receipt(transaction.Id, "", "", []));
+            foreach (var original in restore)
+            {
+                string dest = SafePath(client, original.Path);
+                if (File.Exists(dest) || Directory.Exists(dest))
+                    throw new IOException("Cannot restore a graphics backup over an existing file: " + dest);
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                File.Move(SafePath(state, BackupName + "/" + original.Path), dest);
+            }
+            Write(state, "installed.json", new Receipt(transaction.Id, "", "", [], kept.ToArray(), []));
             Finish(state, transaction);
-            return preserved.ToArray();
         }
         catch
         {
             await RecoverAsync(client, state);
             throw;
+        }
+        RemoveEmptyDirectories(client, receipt.Directories);
+        RemoveEmptyDirectories(state, [BackupName], recursive: true);
+        return (preserved.ToArray(), kept.Count == 0 && !Directory.Exists(SafePath(state, BackupName)));
+    }
+
+    private static void RemoveEmptyDirectories(string root, string[]? relative, bool recursive = false)
+    {
+        foreach (string dir in relative ?? [])
+        {
+            string full = SafePath(root, dir);
+            if (!Directory.Exists(full)) continue;
+            if (recursive)
+                foreach (string child in Directory.GetDirectories(full, "*", SearchOption.AllDirectories)
+                    .OrderByDescending(d => d.Length))
+                    if (!Directory.EnumerateFileSystemEntries(child).Any()) Directory.Delete(child);
+            if (!Directory.EnumerateFileSystemEntries(full).Any()) Directory.Delete(full);
         }
     }
 
@@ -287,6 +414,21 @@ internal static class LumenveilInstaller
         if (Read<Receipt>(state, "installed.json")?.Transaction != pending.Id)
         {
             string staging = SafePath(state, pending.Id);
+            if (pending.Removing)
+            {
+                // Undo restored backups first so the removed package files can return to their places.
+                foreach (InstalledFile original in pending.Replaced ?? [])
+                {
+                    ValidateGraphicsPath(original.Path);
+                    string dest = SafePath(client, original.Path);
+                    string backup = SafePath(state, BackupName + "/" + original.Path);
+                    if (!File.Exists(backup) && File.Exists(dest) && await MatchesAsync(dest, original))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(backup)!);
+                        File.Move(dest, backup);
+                    }
+                }
+            }
             foreach (InstalledFile file in pending.Files)
             {
                 ValidateGraphicsPath(file.Path);
@@ -304,6 +446,23 @@ internal static class LumenveilInstaller
                 {
                     File.Delete(dest);
                 }
+            }
+            if (!pending.Removing)
+            {
+                // Put back the player's files that this interrupted install had moved aside.
+                foreach (InstalledFile original in pending.Replaced ?? [])
+                {
+                    ValidateGraphicsPath(original.Path);
+                    string dest = SafePath(client, original.Path);
+                    string backup = SafePath(state, BackupName + "/" + original.Path);
+                    if (!File.Exists(backup))
+                        continue;
+                    if (File.Exists(dest) || Directory.Exists(dest))
+                        throw new IOException("Cannot restore a graphics backup over an existing file: " + dest);
+                    File.Move(backup, dest);
+                }
+                RemoveEmptyDirectories(client, pending.Directories);
+                RemoveEmptyDirectories(state, [BackupName], recursive: true);
             }
         }
         Finish(state, pending);

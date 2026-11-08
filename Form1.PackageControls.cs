@@ -44,9 +44,22 @@ public partial class Form1
         downloadGraphicsButton = SectionButton("Download Lumenveil", 158, 489, 151, DownloadLumenveilAsync);
         installGraphicsButton = SectionButton("Install", 317, 489, 82, InstallLumenveilAsync);
         removeGraphicsButton = SectionButton("Remove", 407, 489, 82, RemoveLumenveilAsync);
+        SectionButton("ReShade Vulkan setup", 30, 531, 180, ShowReShadeSetupAsync);
         launcherStatus.Text = "Launcher update";
         graphicsStatus.Text = "Optional Graphics\nLumenveil · checking availability";
         UpdatePackageButtons();
+    }
+
+    private Task ShowReShadeSetupAsync()
+    {
+        MessageBox.Show(this,
+            "For the Lumenveil preset that uses DXVK and ReShade, download the official setup from https://reshade.me/.\n\n" +
+            "Close WoW, run ReShade Setup, select the Wow.exe in the client folder you plan to use, and select Vulkan. " +
+            "WoW 3.3.5a uses the 32-bit Vulkan layer. Follow the setup prompts for that executable and install " +
+            "the effect packages listed in the Lumenveil prerequisites.\n\n" +
+            "ReShade Setup manages the system Vulkan layer. This launcher installs graphics files only in your selected WoW folder.",
+            "Optional ReShade Vulkan setup", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        return Task.CompletedTask;
     }
 
     private Label SectionLabel(int top, int height)
@@ -216,17 +229,20 @@ public partial class Form1
             if (!graphicsMutating)
                 await Task.Run(() => LumenveilInstaller.RecoverIfNeededAsync(client));
             bool compatible = package is not null && await LumenveilInstaller.IsCompatibleAsync(client, package);
+            string? installed = LumenveilInstaller.InstalledVersion(client);
             if (IsDisposed || client != wowPath || package != graphicsPackage) return;
             graphicsCompatible = compatible;
             if (package is null)
-                graphicsStatus.Text = "Optional Graphics\nLumenveil is currently unavailable.";
+                graphicsStatus.Text = installed is null ? "Optional Graphics\nLumenveil is currently unavailable."
+                    : $"Optional Graphics\nLumenveil {installed} is installed in this client.";
             else
             {
                 string prerequisites = package.Prerequisites is { Length: > 0 }
                     ? string.Join(", ", package.Prerequisites) : "No published prerequisites";
                 string builds = package.SupportedBuilds is { Length: > 0 } buildsList
                     ? string.Join(", ", buildsList) : "No supported builds published";
-                string compatibility = compatible ? "Selected client is supported."
+                string compatibility = installed is not null ? $"Lumenveil {installed} is installed."
+                    : compatible ? "Selected client is supported."
                     : "Installation is unavailable for the selected client.";
                 graphicsStatus.Text = $"Optional Graphics · Lumenveil {package.Version} · {DownloadStatus.FormatBytes(package.Size)}\n" +
                     $"{builds}. {compatibility}\nPrerequisites · {prerequisites}";
@@ -297,7 +313,7 @@ public partial class Form1
             {
                 string[] preserved = await Task.Run(() => LumenveilInstaller.RemoveAsync(client));
                 graphicsStatus.Text = preserved.Length == 0 ? "Lumenveil removed."
-                    : "Lumenveil removed. These edited files were kept:\n" + string.Join(", ", preserved);
+                    : "Lumenveil removed. These files were kept:\n" + string.Join(", ", preserved);
             }
             else
             {
@@ -306,7 +322,7 @@ public partial class Form1
                     if (reporting && !IsDisposed) RenderPackageProgress(graphicsStatus, graphicsBar, s);
                 });
                 await Task.Run(() => LumenveilInstaller.InstallAsync(client, graphicsPackage!, graphicsZip!, progress));
-                graphicsStatus.Text = "Lumenveil installed.";
+                graphicsStatus.Text = $"Lumenveil {graphicsPackage!.Version} installed.";
             }
         }
         catch (Exception ex)

@@ -28,7 +28,7 @@ Metadata contains Base64 `payload` and `signature` fields. Sign the exact UTF-8 
 3. When approved for release, upload the immutable launcher payload first, then replace the signed metadata asset on `launcher-feed`. Leave the game release and manifest in place.
 4. Enable Lumenveil separately after choosing a distributable build, verifying the precise DLLs and their load chain, qualifying all supported executable fingerprints, and clearing source, licence, texture, shader, and preset obligations. Record any required manual x86 Vulkan/ReShade layer setup and validate the effective preset and visuals in game, including Sun Scatter off. Only then upload the versioned ZIP and publish signed Lumenveil metadata. The launcher installs only client-local files and does not set up a system Vulkan layer.
 
-The active test client reports `CoAVolFog.dll` 0.1.6 (SHA-256 `cb09583524e41281b08060701b72d07244fcf230cad3613daa3ef97743a9a0c4`). The 0.1.5 staging DLL is a different build. The active INI contains `SunScatter=1.04`. No production ZIP, compatibility claim, redistribution approval, or effective off-preset is established by these tests.
+The optional package is built from the working Worgen client. See [LUMENVEIL-PACKAGE.md](LUMENVEIL-PACKAGE.md) for the build command, file list, exclusions and installer tests. See the [Lumenveil release qualification](LUMENVEIL-RELEASE-QUALIFICATION.md) for the selected renderer, private QA preset and hashes, installer results, and remaining redistribution and gameplay gates.
 
 ## Test commands
 

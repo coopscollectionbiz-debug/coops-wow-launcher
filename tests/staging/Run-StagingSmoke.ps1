@@ -1,7 +1,9 @@
 #Requires -Version 7.0
 param(
     [Parameter(Mandatory)][string]$OutputRoot,
-    [string]$DisposableClient
+    [string]$DisposableClient,
+    [string]$QaGraphicsZip,
+    [switch]$KeepQaGraphicsInstalled
 )
 $ErrorActionPreference = 'Stop'
 $project = Join-Path $PSScriptRoot '../../CoopsWoWLauncher.csproj'
@@ -103,6 +105,53 @@ try {
     $base = 'http://127.0.0.1:' + (Get-Content -LiteralPath $portFile -Raw)
 
     Build '1.3.0' "$root/bootstrap"
+    if ($QaGraphicsZip) {
+        Assert ([bool]$DisposableClient) 'Provide a disposable client for the QA ZIP'
+        $client = (Resolve-Path -LiteralPath $DisposableClient).Path
+        $original = 'C:\WoWClient-Worgen-Test'
+        Assert ($client -ne $original -and !$client.StartsWith($original + '\', [StringComparison]::OrdinalIgnoreCase)) 'Choose a separate disposable copy'
+        Assert (((Get-Item -LiteralPath $client).Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) 'Disposable client may not be a link'
+        $asset = Join-Path $feed 'Lumenveil-0.1.6-QA.zip'
+        Copy-Item -LiteralPath $QaGraphicsZip -Destination $asset
+        $archive = [IO.Compression.ZipFile]::OpenRead($asset)
+        $expected = @{}
+        try {
+            foreach ($entry in $archive.Entries) {
+                $stream = $entry.Open()
+                try { $expected.Add($entry.FullName, [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream))) }
+                finally { $stream.Dispose() }
+            }
+        } finally { $archive.Dispose() }
+        $wow = Join-Path $client 'Wow.exe'
+        $hash = (Get-FileHash -LiteralPath $wow).Hash
+        Write-Feed 'lumenveil' '0.1.6' $asset @{
+            installationEnabled = $true; compatibleWowSha256 = @($hash)
+            supportedBuilds = @('Local QA executable only'); prerequisites = @('Private graphics qualification')
+            files = @($expected.Keys)
+        }
+        $run = New-Run 'real graphics archive' $client
+        Start-Smoke $run 'graphics'
+        foreach ($file in $expected.Keys) {
+            Assert (!(Test-Path -LiteralPath (Join-Path $client $file))) "Opt-in download wrote $file into WoW"
+        }
+        Start-Smoke $run 'graphics-install'
+        Check-Progress $run.Log @('Downloading', 'Verifying', 'Download verified', 'Extracting', 'Installing', 'Lumenveil installed')
+        foreach ($file in $expected.Keys) {
+            Assert ((Get-FileHash -LiteralPath (Join-Path $client $file)).Hash -eq $expected[$file]) "Installed bytes differ for $file"
+        }
+        if ($KeepQaGraphicsInstalled) {
+            Assert ((Get-FileHash -LiteralPath $wow).Hash -eq $hash) 'Graphics QA changed Wow.exe'
+            Write-Output "PASS private QA ZIP installed with $($expected.Count) matching hashes; left installed for the Play check"
+            return
+        }
+        Start-Smoke $run 'graphics-remove'
+        foreach ($file in $expected.Keys) {
+            Assert (!(Test-Path -LiteralPath (Join-Path $client $file))) "Remove left $file behind"
+        }
+        Assert ((Get-FileHash -LiteralPath $wow).Hash -eq $hash) 'Graphics QA changed Wow.exe'
+        Write-Output "PASS private QA ZIP downloaded, verified, installed and removed; $($expected.Count) installed hashes matched"
+        return
+    }
     Build '1.3.1' "$root/good"
     Build '1.3.2' "$root/broken" -FailStartup
     $good = Join-Path $feed 'CoopLauncher-1.3.1.exe'
