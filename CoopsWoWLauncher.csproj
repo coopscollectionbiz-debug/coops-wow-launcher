@@ -9,10 +9,15 @@
     <Version Condition="'$(Version)' == ''">1.3.0</Version>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
     <DefineConstants Condition="'$(StagingFeeds)' == 'true'">$(DefineConstants);STAGING_FEEDS</DefineConstants>
+    <!-- Production feed trust keys (public halves only; the private keys stay with the release signer).
+         Staging builds override both with ephemeral QA keys. -->
+    <LauncherFeedKey Condition="'$(LauncherFeedKey)' == ''">MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzPIhZ7NFfFmv9y36R4tbLReWiZZRfZEyQwfDo6vzOT0bJd/yHv4lKPAN3P0Zp3oeoN1USYMZhDBVbq+J7Dx9zw==</LauncherFeedKey>
+    <LumenveilFeedKey Condition="'$(LumenveilFeedKey)' == ''">MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAERvMSurHRMsdD+GKsVHMCa1Y2NSZwLcHphcPVg97Cokm1hIxlL1oX6e8RRJwDSXotr9vBp0kw9tSWjmkDSoFi2Q==</LumenveilFeedKey>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <Compile Remove="tools/**/*.cs" />
     <AssemblyMetadata Include="LauncherFeedKey" Value="$(LauncherFeedKey)" />
     <AssemblyMetadata Include="LumenveilFeedKey" Value="$(LumenveilFeedKey)" />
     <AssemblyMetadata Include="StagingFeeds" Value="$(StagingFeeds)" />

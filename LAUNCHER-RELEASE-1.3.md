@@ -1,4 +1,4 @@
-# Launcher 1.3 candidate
+# Launcher 1.3 release
 
 This branch starts at `release/v1.2.0` (`fe0f6d0`). It includes the patch verification and recovery from `c950ffa`. The required game manifest and asset URLs still point to the existing `v1.2.0` release.
 
@@ -11,13 +11,23 @@ dotnet publish .\CoopsWoWLauncher.csproj -c Release -r win-x64 --self-contained 
 Get-FileHash .\bin\portable\CoopsWoWLauncher.exe -Algorithm SHA256
 ```
 
-For a release bootstrap, pass `"-p:LauncherFeedKey=$launcherPublicKey"`. The value is the Base64 DER SubjectPublicKeyInfo of the approved ECDSA P-256 signing key. Embed the approved Lumenveil key with `"-p:LumenveilFeedKey=$graphicsPublicKey"` when it is available. Private keys stay in the signing environment. A build with no key for a feed displays that feed as unavailable. A key added or replaced after distribution requires a bootstrap that trusts it.
+The production trust keys are the defaults in `CoopsWoWLauncher.csproj`. They are the Base64 DER SubjectPublicKeyInfo of two ECDSA P-256 keys, one for `launcher` and one for `lumenveil`, created on 2026-11-08. A plain release build therefore trusts the production feeds. Staging builds override both keys with temporary ones.
+
+The private keys are not in the repository or any release. They are in the release signer's private folder (`%USERPROFILE%\.coops-launcher-signing`, readable only by that account and SYSTEM). Keep an offline backup. If a key is lost or replaced, every installed launcher needs a one-time manual download of a build that trusts the new key.
+
+Sign and check feeds with [`tools/feed-signer`](tools/feed-signer/Program.cs):
+
+```powershell
+dotnet run --project .\tools\feed-signer -c Release -- sign --private <private.pem> --payload <payload.json> --out metadata.json
+dotnet run --project .\tools\feed-signer -c Release -- verify --public <public.txt> --metadata metadata.json --channel launcher
+dotnet run --project .\tools\feed-signer -c Release -- check-live   # uses the launcher's own SignedPackageFeed with the embedded keys
+```
 
 ## Release assets
 
 | Channel | Stable metadata | Versioned payload |
 | --- | --- | --- |
-| Launcher | `launcher-feed/metadata.json` | `launcher-v1.3.1/CoopLauncher-1.3.1.exe` |
+| Launcher | `launcher-feed/metadata.json` | `launcher-v<version>/CoopsWoWLauncher.exe` (1.3.0 is the first) |
 | Required game assets | Existing `v1.2.0/manifest.json` | Existing `v1.2.0` assets |
 | Optional Lumenveil | `lumenveil-feed/metadata.json` | `lumenveil-v<version>/Lumenveil-<version>.zip` |
 

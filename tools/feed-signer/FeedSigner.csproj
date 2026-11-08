@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Release signing for the launcher and Lumenveil feeds. Keys are never stored in the repository:
+       genkey writes them to a path you choose outside it. check-live compiles the launcher's own
+       SignedPackageFeed.cs, so it validates the published feeds with exactly the code players run. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../SignedPackageFeed.cs" Link="SignedPackageFeed.cs" />
+    <Compile Include="../../ReleaseUpdater.cs" Link="ReleaseUpdater.cs" />
+    <Compile Include="../../DownloadProgress.cs" Link="DownloadProgress.cs" />
+    <AssemblyMetadata Include="LauncherFeedKey" Value="$(LauncherFeedKey)" />
+    <AssemblyMetadata Include="LumenveilFeedKey" Value="$(LumenveilFeedKey)" />
+  </ItemGroup>
+</Project>
