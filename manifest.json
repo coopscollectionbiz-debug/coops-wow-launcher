@@ -1,8 +1,8 @@
 {
   "schema": 2,
-  "releaseId": "release1-hd-prerequisites-20261106.1",
-  "payloadVersion": "release1-p7-client-20261104.1",
-  "p2ManifestRevision": "release1-p2-20261103.3 + P7 client fixes (see RELEASE1-CLIENT-LAUNCHER.md)",
+  "releaseId": "release1.2.1-20261109.1",
+  "payloadVersion": "release1.2.1-client-20261109.1",
+  "p2ManifestRevision": "release1-p2-20261103.3 + P7 client fixes (see RELEASE1-CLIENT-LAUNCHER.md); Release 1.2: patch-z adds race Paladin Charger models (displays 39100-39107); Release 1.2.1: MultiBot-Chatless 020210b (needs mod-multibot-bridge 9f0e8ba) and DungeonClear 3.6",
   "minimumLauncherVersion": "1.2.0",
   "client": {
     "build": "3.3.5.12340",
@@ -12,12 +12,13 @@
   "files": [
     {
       "name": "patch-z.mpq",
-      "sourceFile": "patch-z-release1-p7-client-20261104.1.mpq",
-      "sha256": "565d1b17e676ea54f78b7a0898dbbda064ee27b0c629344b42578e9aea660dee",
-      "size": 134636848,
+      "sourceFile": "patch-z-release1.2-client-20261109.1.mpq",
+      "sha256": "d421c3a71286df616fc5496669769e444f0879d3ed5da662779f2f275aa7eea4",
+      "size": 127317529,
       "type": "file",
       "destination": "Data\\patch-z.mpq",
       "knownPreviousSha256": [
+        "565d1b17e676ea54f78b7a0898dbbda064ee27b0c629344b42578e9aea660dee",
         "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37",
         "41be2bf9dc11ab28c913131f29da81f981e25d9df8651bcef7788ff891591fdc",
         "1a80c3bd2b63af6b889fe90ba5776ec42bc17e487072e0e272ec5cd0f5d6ddde"
@@ -25,11 +26,11 @@
     },
     {
       "name": "MultiBot",
-      "sourceFile": "MultiBot.zip",
-      "sha256": "fdd3bc881fc6f83e3f463f2a17fe41f74a18342e3f6b14d39a6e42f4ef5e890b",
+      "sourceFile": "MultiBot-chatless-020210b.zip",
+      "sha256": "559cd4fbaa218c267b346d98e1ee08d1a69656508568ef5e7daecef552c0887f",
       "type": "addon",
       "destination": "Interface\\AddOns\\MultiBot",
-      "size": 1478007
+      "size": 4910891
     },
     {
       "name": "CleanBot",
@@ -41,11 +42,11 @@
     },
     {
       "name": "DungeonClear",
-      "sourceFile": "DungeonClear.zip",
-      "sha256": "b624fe01d5672f98fc009c1c6989a2bfd39241404fb896ede574cf06a042dd1b",
+      "sourceFile": "DungeonClear-3.6-088e6e0.zip",
+      "sha256": "4d2d4ed5d386a8cea58d9e8c3449baf4e04a603a45ed2a4a0a1e42a84fc25f2b",
       "type": "addon",
       "destination": "Interface\\AddOns\\DungeonClear",
-      "size": 32496
+      "size": 37281
     },
     {
       "name": "Transmog",
