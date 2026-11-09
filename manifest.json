@@ -1,8 +1,8 @@
 {
   "schema": 2,
-  "releaseId": "release1.2.1-20261109.1",
-  "payloadVersion": "release1.2.1-client-20261109.1",
-  "p2ManifestRevision": "release1-p2-20261103.3 + P7 client fixes (see RELEASE1-CLIENT-LAUNCHER.md); Release 1.2: patch-z adds race Paladin Charger models (displays 39100-39107); Release 1.2.1: MultiBot-Chatless 020210b (needs mod-multibot-bridge 9f0e8ba) and DungeonClear 3.6",
+  "releaseId": "release1.2.3-20261109.1",
+  "payloadVersion": "release1.2.3-client-20261109.1",
+  "p2ManifestRevision": "release1-p2-20261103.3 + P7 client fixes (see RELEASE1-CLIENT-LAUNCHER.md); Release 1.2: patch-z adds race Paladin Charger models (displays 39100-39107); Release 1.2.1: MultiBot-Chatless 020210b (needs mod-multibot-bridge 9f0e8ba) and DungeonClear 3.6; Release 1.2.3: patch-z adds Warlock demon and Druid form looks (displays 39200-39436, models 7300-7368) and the PetFormTransmog addon (needs mod-pet-form-transmog)",
   "minimumLauncherVersion": "1.2.0",
   "client": {
     "build": "3.3.5.12340",
@@ -12,12 +12,13 @@
   "files": [
     {
       "name": "patch-z.mpq",
-      "sourceFile": "patch-z-release1.2-client-20261109.1.mpq",
-      "sha256": "d421c3a71286df616fc5496669769e444f0879d3ed5da662779f2f275aa7eea4",
-      "size": 127317529,
+      "sourceFile": "patch-z-release1.2.3-client-20261109.1.mpq",
+      "sha256": "cb89c691ab4d6cb4a910ecb50d7898788c00c342b168c25679238208d413a90f",
+      "size": 229297750,
       "type": "file",
       "destination": "Data\\patch-z.mpq",
       "knownPreviousSha256": [
+        "d421c3a71286df616fc5496669769e444f0879d3ed5da662779f2f275aa7eea4",
         "565d1b17e676ea54f78b7a0898dbbda064ee27b0c629344b42578e9aea660dee",
         "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37",
         "41be2bf9dc11ab28c913131f29da81f981e25d9df8651bcef7788ff891591fdc",
@@ -63,6 +64,14 @@
       "type": "addon",
       "destination": "Interface\\AddOns\\TransmogCollection",
       "size": 2994
+    },
+    {
+      "name": "PetFormTransmog",
+      "sourceFile": "PetFormTransmog-1.0.0-f750bab.zip",
+      "sha256": "be3896ace57fe7c7a022c24aeb9392a9a82fb81f8d15375894000e9e300b4def",
+      "type": "addon",
+      "destination": "Interface\\AddOns\\PetFormTransmog",
+      "size": 6202
     },
     {
       "name": "Data/enus/patch-enus-a.mpq",
