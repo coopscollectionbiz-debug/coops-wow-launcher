@@ -1,6 +1,6 @@
 {
   "name": "Lumenveil",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Graphics files copied from the working C:\\WoWClient-Worgen-Test client (2026-11-08 snapshot), plus the ReShade 6.8.0.2157 runtime that client loads from C:\\ProgramData\\ReShade, set up as a client-local Vulkan layer.",
   "defaultSource": "C:\\WoWClient-Worgen-Test",
   "files": [
