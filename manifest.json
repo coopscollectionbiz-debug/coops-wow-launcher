@@ -1,7 +1,7 @@
 {
   "schema": 2,
-  "releaseId": "release1.2.3-20261109.1",
-  "payloadVersion": "release1.2.3-client-20261109.1",
+  "releaseId": "release1.3-hd-20261110.1",
+  "payloadVersion": "release1.3-hd-client-20261110.1",
   "p2ManifestRevision": "release1-p2-20261103.3 + P7 client fixes (see RELEASE1-CLIENT-LAUNCHER.md); Release 1.2: patch-z adds race Paladin Charger models (displays 39100-39107); Release 1.2.1: MultiBot-Chatless 020210b (needs mod-multibot-bridge 9f0e8ba) and DungeonClear 3.6; Release 1.2.3: patch-z adds Warlock demon and Druid form looks (displays 39200-39436, models 7300-7368) and the PetFormTransmog addon (needs mod-pet-form-transmog)",
   "minimumLauncherVersion": "1.2.0",
   "client": {
@@ -12,9 +12,9 @@
   "files": [
     {
       "name": "patch-z.mpq",
-      "sourceFile": "patch-z-release1.2.3-client-20261109.1.mpq",
-      "sha256": "cb89c691ab4d6cb4a910ecb50d7898788c00c342b168c25679238208d413a90f",
-      "size": 229297750,
+      "sourceFile": "patch-z-release1.3-hd-client-20261110.1.mpq",
+      "sha256": "1583d8b5b8ef6bcd2d85db3558db02e645f835d21cf8df496a071e54d8267e39",
+      "size": 271974565,
       "type": "file",
       "destination": "Data\\patch-z.mpq",
       "knownPreviousSha256": [
@@ -22,7 +22,8 @@
         "565d1b17e676ea54f78b7a0898dbbda064ee27b0c629344b42578e9aea660dee",
         "e76961ecbcc1800b3d5addd9267dd41bb6015a23085e3649f277954d361c8b37",
         "41be2bf9dc11ab28c913131f29da81f981e25d9df8651bcef7788ff891591fdc",
-        "1a80c3bd2b63af6b889fe90ba5776ec42bc17e487072e0e272ec5cd0f5d6ddde"
+        "1a80c3bd2b63af6b889fe90ba5776ec42bc17e487072e0e272ec5cd0f5d6ddde",
+        "cb89c691ab4d6cb4a910ecb50d7898788c00c342b168c25679238208d413a90f"
       ]
     },
     {
@@ -662,6 +663,19 @@
       "size": 7704216,
       "critical": true,
       "note": "WoW 3.3.5.12340 executable"
+    }
+  ],
+  "optionalPacks": [
+    {
+      "name": "HD Environment Pack",
+      "destination": "Data/patch-y.mpq",
+      "sha256": [
+        "c7de46e482456813f020bf2137e9838019164c78836e923155201d4c9297505a"
+      ],
+      "requiredCoreSha256": [
+        "1583d8b5b8ef6bcd2d85db3558db02e645f835d21cf8df496a071e54d8267e39"
+      ],
+      "coreDestination": "Data/patch-z.mpq"
     }
   ]
 }
