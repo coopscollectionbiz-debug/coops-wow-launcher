@@ -17,6 +17,8 @@ internal sealed class PackageMetadata
     public string[] SupportedBuilds { get; init; } = [];
     public string[] Prerequisites { get; init; } = [];
     public string[] Files { get; init; } = [];
+    /// <summary>HD Environment Pack only: the mandatory Data\patch-z.mpq builds the pack was validated against.</summary>
+    public string[] RequiredCoreSha256 { get; init; } = [];
     public bool InstallationEnabled { get; init; }
 }
 
@@ -37,6 +39,9 @@ internal sealed class SignedPackageFeed(HttpClient http, string channel, string 
 
     internal static SignedPackageFeed Lumenveil(HttpClient http) => new(http, "lumenveil",
         Endpoint("LumenveilFeedUrl", "lumenveil-feed"), BuildSetting("LumenveilFeedKey"));
+
+    internal static SignedPackageFeed HdEnvironment(HttpClient http) => new(http, "hdenv",
+        Endpoint("HdEnvFeedUrl", "hdenv-feed"), BuildSetting("HdEnvFeedKey"));
 
     private static string Endpoint(string setting, string tag) =>
         Staging && BuildSetting(setting) is { Length: > 0 } url ? url : Releases + tag + "/metadata.json";
@@ -82,12 +87,13 @@ internal sealed class SignedPackageFeed(HttpClient http, string channel, string 
 
         var package = JsonSerializer.Deserialize<PackageMetadata>(payload, Json)
             ?? throw new InvalidDataException("Signed package metadata is empty.");
-        string extension = channel == "launcher" ? ".exe" : ".zip";
+        string extension = channel switch { "launcher" => ".exe", "hdenv" => ".mpq", _ => ".zip" };
         if (package.Channel != channel || !Version.TryParse(package.Version, out var version) ||
             version.Build < 0 || version.Revision >= 0 || version.ToString() != package.Version || package.Size <= 0 ||
             !IsSha256(package.Sha256) || package.Filename is null ||
             !Regex.IsMatch(package.Filename, @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\z") ||
-            !package.Filename.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            !package.Filename.EndsWith(extension, StringComparison.OrdinalIgnoreCase) ||
+            (channel == "hdenv" && (package.RequiredCoreSha256.Length == 0 || !package.RequiredCoreSha256.All(IsSha256))))
             throw new InvalidDataException("Signed package metadata has invalid fields.");
 
         Uri asset = TrustedUri(package.Url);

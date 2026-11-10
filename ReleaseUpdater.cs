@@ -28,6 +28,20 @@ public sealed class UpdateManifest
     public List<UpdateFile> Files { get; set; } = new();
     public List<ObsoleteFile> ObsoleteFiles { get; set; } = new();
     public List<BaselineFile> RequiredBaseline { get; set; } = new();
+    // Optional packs the release authorizes (for example the HD Environment Pack, Data/patch-y.mpq). A file at a
+    // listed destination is exempt from an obsolete/quarantine rule only when its full SHA-256 is listed here, the
+    // core this release installs is one of RequiredCoreSha256, and the player enabled it through the launcher.
+    // Launchers that predate this field ignore it, so for them the quarantine rule still applies.
+    public List<OptionalPack> OptionalPacks { get; set; } = new();
+}
+
+public sealed class OptionalPack
+{
+    public string Name { get; set; } = "";
+    public string Destination { get; set; } = "";
+    public List<string> Sha256 { get; set; } = new();
+    public List<string> RequiredCoreSha256 { get; set; } = new();
+    public string? CoreDestination { get; set; } = "Data/patch-z.mpq";
 }
 
 public sealed class ClientProfile
@@ -376,7 +390,51 @@ public sealed class ReleaseUpdater
         }
 
         foreach (ObsoleteFile o in m.ObsoleteFiles) Resolve(o.Path);
+        foreach (OptionalPack p in m.OptionalPacks)
+        {
+            Resolve(p.Destination);
+            string d = Norm(p.Destination);
+            // An optional pack must load BELOW the release patch (patch-z) and must not be a managed or baseline file.
+            if (!Regex.IsMatch(d, @"\Adata/patch-[a-y]\.mpq\z") ||
+                m.Files.Any(f => Norm(f.Destination) == d) || m.RequiredBaseline.Any(b => Norm(b.Path) == d) ||
+                p.Sha256.Count == 0 || !p.Sha256.All(ValidHash) ||
+                p.RequiredCoreSha256.Count == 0 || !p.RequiredCoreSha256.All(ValidHash))
+                throw InvalidManifest("Optional pack entry is invalid: " + p.Destination);
+            if (p.CoreDestination is not null) Resolve(p.CoreDestination);
+        }
         foreach (BaselineFile b in m.RequiredBaseline) Resolve(b.Path);
+    }
+
+    /// <summary>
+    /// True only when every condition holds: the manifest lists this destination as an optional pack; the file's full
+    /// SHA-256 is one the manifest authorizes; the core this release leaves installed is in RequiredCoreSha256; and the
+    /// launcher's HD-pack receipt says the player installed and enabled exactly this file.
+    /// </summary>
+    internal async Task<bool> IsAuthorizedOptionalPackAsync(UpdateManifest m, string relativePath, string full, CancellationToken ct = default)
+    {
+        string rel = Norm(relativePath);
+        var entries = m.OptionalPacks.Where(p => Norm(p.Destination) == rel && p.Sha256.Count > 0 && p.RequiredCoreSha256.Count > 0).ToList();
+        if (entries.Count == 0) return false;
+        HdPackInstaller.Receipt? receipt = HdPackInstaller.Installed(root);
+        if (receipt is null || !receipt.Enabled) return false;
+        string sha = await Sha256Async(full, ct);
+        if (!sha.Equals(receipt.Sha256, StringComparison.OrdinalIgnoreCase)) return false;
+        // A manifest may authorize several pack versions (several entries or several hashes); any one entry that lists
+        // this exact file AND the core this release leaves installed is enough.
+        foreach (OptionalPack op in entries.Where(p => p.Sha256.Any(h => h.Equals(sha, StringComparison.OrdinalIgnoreCase))))
+        {
+            string coreRel = Norm(op.CoreDestination ?? "Data/patch-z.mpq");
+            // The core after this release: the manifest's file for that destination if it ships one, else what is installed.
+            string? core = m.Files.FirstOrDefault(f => f.Type.Equals("file", StringComparison.OrdinalIgnoreCase) && Norm(f.Destination) == coreRel)?.Sha256;
+            if (core is null)
+            {
+                string coreFull = Resolve(op.CoreDestination ?? "Data/patch-z.mpq");
+                if (!File.Exists(coreFull)) continue;
+                core = await Sha256Async(coreFull, ct);
+            }
+            if (op.RequiredCoreSha256.Any(h => h.Equals(core, StringComparison.OrdinalIgnoreCase))) return true;
+        }
+        return false;
     }
 
     private static bool ValidHash(string? hash) => hash != null && Regex.IsMatch(hash, @"\A[0-9a-fA-F]{64}\z");
@@ -524,7 +582,8 @@ public sealed class ReleaseUpdater
         {
             string name = Path.GetFileName(file);
             Match mt = single.Match(name);
-            if (!mt.Success || known.Contains("data/" + name.ToLowerInvariant()))
+            if (!mt.Success || known.Contains("data/" + name.ToLowerInvariant()) ||
+                (m.OptionalPacks.Any(p => Norm(p.Destination) == "data/" + name.ToLowerInvariant()) && HdPackInstaller.LooksManaged(root, file)))
                 continue;
 
             char c = char.ToLowerInvariant(mt.Groups[1].Value[0]);
@@ -617,7 +676,9 @@ public sealed class ReleaseUpdater
         foreach (ObsoleteFile o in m.ObsoleteFiles)
         {
             string full = Resolve(o.Path);
-            if (File.Exists(full))
+            // The HD Environment Pack reuses the old Data\patch-y.mpq name. Only an authorized, enabled, unmodified
+            // pack for the installed core is spared; a legacy, unknown or modified patch-y is still quarantined.
+            if (File.Exists(full) && !await IsAuthorizedOptionalPackAsync(m, o.Path, full, ct))
                 obsolete.Add((o, full));
         }
 

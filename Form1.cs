@@ -101,6 +101,7 @@ public partial class Form1 : Form
         Controls.Add(patchButton);
         Controls.Add(launchButton);
         InitializePackageControls();
+        InitializeHdPackControls();
 
         LoadSavedPath();
         RefreshStatus();
@@ -119,8 +120,9 @@ public partial class Form1 : Form
 #endif
         Task launcher = CheckLauncherAsync();
         Task graphics = CheckLumenveilAsync();
+        Task hd = CheckHdPackAsync();
         Task patch = IsValidWowPath() ? CheckAndInstallPatchAsync() : Task.CompletedTask;
-        await Task.WhenAll(launcher, graphics, patch);
+        await Task.WhenAll(launcher, graphics, hd, patch);
     }
 
     private bool IsValidWowPath()
@@ -197,10 +199,11 @@ public partial class Form1 : Form
 
             wowPath = dialog.SelectedPath;
             graphicsCompatible = false;
-            UpdatePackageButtons();
+            UpdatePackageButtons(); UpdateHdButtons();
             SavePath();
             RefreshStatus();
             _ = RefreshGraphicsClientAsync();
+            _ = CheckHdPackAsync();
         }
     }
 
@@ -211,7 +214,7 @@ public partial class Form1 : Form
 
     private async Task CheckAndInstallPatchAsync()
     {
-        if (patchBusy || graphicsMutating)
+        if (patchBusy || graphicsMutating || hdMutating)
             return;
 
         if (!IsValidWowPath())
@@ -221,7 +224,7 @@ public partial class Form1 : Form
         }
 
         patchBusy = true;
-        UpdatePackageButtons();
+        UpdatePackageButtons(); UpdateHdButtons();
         browseButton.Enabled = false;
         patchButton.Enabled = false;
         launchButton.Enabled = false;
@@ -344,7 +347,7 @@ public partial class Form1 : Form
             browseButton.Enabled = true;
             patchButton.Enabled = IsValidWowPath();
             launchButton.Enabled = IsValidWowPath();
-            UpdatePackageButtons();
+            UpdatePackageButtons(); UpdateHdButtons();
         }
     }
 

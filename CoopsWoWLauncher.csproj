@@ -6,13 +6,14 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version Condition="'$(Version)' == ''">1.3.1</Version>
+    <Version Condition="'$(Version)' == ''">1.4.0</Version>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
     <DefineConstants Condition="'$(StagingFeeds)' == 'true'">$(DefineConstants);STAGING_FEEDS</DefineConstants>
     <!-- Production feed trust keys (public halves only; the private keys stay with the release signer).
          Staging builds override both with ephemeral QA keys. -->
     <LauncherFeedKey Condition="'$(LauncherFeedKey)' == ''">MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzPIhZ7NFfFmv9y36R4tbLReWiZZRfZEyQwfDo6vzOT0bJd/yHv4lKPAN3P0Zp3oeoN1USYMZhDBVbq+J7Dx9zw==</LauncherFeedKey>
     <LumenveilFeedKey Condition="'$(LumenveilFeedKey)' == ''">MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAERvMSurHRMsdD+GKsVHMCa1Y2NSZwLcHphcPVg97Cokm1hIxlL1oX6e8RRJwDSXotr9vBp0kw9tSWjmkDSoFi2Q==</LumenveilFeedKey>
+    <HdEnvFeedKey Condition="'$(HdEnvFeedKey)' == ''">MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2Yfjxgkz4DaE7mVA5EN10ZUgiOl/4zFPAP9/x0PemrjODhX3DeLL7n0TORTvhx+Tud3yfZqcNjQCRE4KK2H1KQ==</HdEnvFeedKey>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +24,8 @@
     <AssemblyMetadata Include="StagingFeeds" Value="$(StagingFeeds)" />
     <AssemblyMetadata Include="LauncherFeedUrl" Value="$(LauncherFeedUrl)" />
     <AssemblyMetadata Include="LumenveilFeedUrl" Value="$(LumenveilFeedUrl)" />
+    <AssemblyMetadata Include="HdEnvFeedKey" Value="$(HdEnvFeedKey)" />
+    <AssemblyMetadata Include="HdEnvFeedUrl" Value="$(HdEnvFeedUrl)" />
     <AssemblyMetadata Include="FailStartup" Value="$(FailStartup)" />
   </ItemGroup>
 </Project>

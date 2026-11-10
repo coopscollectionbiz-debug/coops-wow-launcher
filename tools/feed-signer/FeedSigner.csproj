@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Release signing for the launcher and Lumenveil feeds. Keys are never stored in the repository:
+  <!-- Release signing for the launcher, Lumenveil and HD Environment Pack feeds. Keys are never stored in the repository:
        genkey writes them to a path you choose outside it. check-live compiles the launcher's own
        SignedPackageFeed.cs, so it validates the published feeds with exactly the code players run. -->
   <PropertyGroup>
@@ -13,7 +13,9 @@
     <Compile Include="../../SignedPackageFeed.cs" Link="SignedPackageFeed.cs" />
     <Compile Include="../../ReleaseUpdater.cs" Link="ReleaseUpdater.cs" />
     <Compile Include="../../DownloadProgress.cs" Link="DownloadProgress.cs" />
+    <Compile Include="../../HdPackInstaller.cs" Link="HdPackInstaller.cs" />
     <AssemblyMetadata Include="LauncherFeedKey" Value="$(LauncherFeedKey)" />
     <AssemblyMetadata Include="LumenveilFeedKey" Value="$(LumenveilFeedKey)" />
+    <AssemblyMetadata Include="HdEnvFeedKey" Value="$(HdEnvFeedKey)" />
   </ItemGroup>
 </Project>

@@ -7,7 +7,8 @@ public enum DownloadKind
     LauncherUpdate,
     GamePatch,
     Addon,
-    Lumenveil
+    Lumenveil,
+    HdEnvironment
 }
 
 public enum DownloadPhase
@@ -29,6 +30,7 @@ public sealed record DownloadItem(DownloadKind Kind, string Filename, int Positi
         DownloadKind.GamePatch => "Game patch",
         DownloadKind.Addon => "Addon",
         DownloadKind.Lumenveil => "Lumenveil",
+        DownloadKind.HdEnvironment => "HD Environment Pack",
         _ => throw new ArgumentOutOfRangeException(nameof(Kind))
     };
 }

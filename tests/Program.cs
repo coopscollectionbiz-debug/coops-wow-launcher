@@ -17,7 +17,7 @@ static class Tests
     {
         string root = Path.Combine(Sandbox, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        var m=Manifest(); m.Files.RemoveAll(f=>f.Type!="file"); m.ObsoleteFiles.Clear();
+        var m=Manifest(); m.Files.RemoveAll(f=>f.Type!="file"); m.ObsoleteFiles.Clear(); m.OptionalPacks.Clear();
         var payloads=new Dictionary<string, byte[]>();
         foreach (var b in m.RequiredBaseline)
         {
@@ -41,7 +41,7 @@ static class Tests
             {
                 await Run("real release payloads install and verify in isolated synthetic base client",async()=> {
                     string root=Path.Combine(Sandbox,"real-assets"); Directory.CreateDirectory(root);
-                    var m=Manifest(); m.Files.RemoveAll(f=>f.Type!="file"); m.ObsoleteFiles.Clear();
+                    var m=Manifest(); m.Files.RemoveAll(f=>f.Type!="file"); m.ObsoleteFiles.Clear(); m.OptionalPacks.Clear();
                     var supplied=m.Files.Where(f=>f.SuppliesBaseline).Select(f=>f.Destination.Replace('\\','/')).ToHashSet(StringComparer.OrdinalIgnoreCase);
                     foreach(var b in m.RequiredBaseline.Where(b=>!b.Optional && !supplied.Contains(b.Path))) {
                         byte[] bytes=Bytes("synthetic base "+b.Path); b.Size=bytes.Length; b.Sha256=Hash(bytes); Write(root,b.Path,bytes);
@@ -213,6 +213,99 @@ static class Tests
             });
             await Run("multipart size mismatch rejected before downloading",async()=> {
                 var(r,m,u)=Fixture(); var f=m.Files[0]; f.Parts.Add(new(){SourceFile="part",Size=1,Sha256=new string('0',64)});
+                await Expect("MANIFEST_INVALID",()=>u.ApplyAsync(m));
+            });
+            // ---- HD Environment Pack (optional Data\patch-y.mpq) ----
+            static (string Root, string Pack, string Sha) HdFixture(string content="hd pack v1")
+            {
+                string root=Path.Combine(Sandbox,"hd-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(Path.Combine(root,"Data"));
+                File.WriteAllBytes(Path.Combine(root,"Data","patch-z.mpq"),Bytes("core patch-z"));
+                string pack=Path.Combine(root,"download-"+content.Replace(' ','-')+".mpq"); byte[] b=Bytes(content); File.WriteAllBytes(pack,b);
+                return (root,pack,Hash(b));
+            }
+            await Run("HD pack installs as Data/patch-y.mpq without touching patch-z",async()=> {
+                var(r,pack,sha)=HdFixture(); byte[] z=File.ReadAllBytes(Full(r,"Data/patch-z.mpq"));
+                await HdPackInstaller.InstallAsync(r,"1.0.0",sha,new FileInfo(pack).Length,pack);
+                Check(Hash(File.ReadAllBytes(Full(r,"Data/patch-y.mpq")))==sha,"Pack not installed");
+                Check(File.ReadAllBytes(Full(r,"Data/patch-z.mpq")).SequenceEqual(z),"patch-z changed");
+                Check(HdPackInstaller.Installed(r) is { Enabled: true },"Receipt missing");
+                Check(!File.Exists(Full(r,".coops-hdpack/pending.json")),"Journal left behind");
+            });
+            await Run("HD pack disable/enable moves the file only, keeps preference, no patch-z change",async()=> {
+                var(r,pack,sha)=HdFixture(); await HdPackInstaller.InstallAsync(r,"1.0.0",sha,new FileInfo(pack).Length,pack);
+                File.Delete(pack); byte[] z=File.ReadAllBytes(Full(r,"Data/patch-z.mpq"));
+                await HdPackInstaller.SetEnabledAsync(r,false);
+                Check(!File.Exists(Full(r,"Data/patch-y.mpq")),"Disabled pack still loads");
+                Check(HdPackInstaller.Installed(r) is { Enabled: false },"Preference not stored");
+                await HdPackInstaller.SetEnabledAsync(r,true);
+                Check(Hash(File.ReadAllBytes(Full(r,"Data/patch-y.mpq")))==sha,"Re-enable needed a download or changed the file");
+                Check(File.ReadAllBytes(Full(r,"Data/patch-z.mpq")).SequenceEqual(z),"patch-z changed by toggling");
+            });
+            await Run("HD pack refuses a foreign Data/patch-y.mpq and a corrupt download",async()=> {
+                var(r,pack,sha)=HdFixture(); File.WriteAllBytes(Full(r,"Data/patch-y.mpq"),Bytes("legacy eye patch"));
+                try { await HdPackInstaller.InstallAsync(r,"1.0.0",sha,new FileInfo(pack).Length,pack); throw new Exception("foreign file overwritten"); } catch(IOException) {}
+                Check(File.ReadAllText(Full(r,"Data/patch-y.mpq"))=="legacy eye patch","Foreign patch-y changed");
+                var(r2,pack2,sha2)=HdFixture();
+                try { await HdPackInstaller.InstallAsync(r2,"1.0.0",new string('0',64),new FileInfo(pack2).Length,pack2); throw new Exception("bad hash accepted"); } catch(InvalidDataException) {}
+                Check(!File.Exists(Full(r2,"Data/patch-y.mpq")),"Corrupt pack installed");
+            });
+            await Run("HD pack update keeps the old pack until the new one is in place; interrupted update rolls back",async()=> {
+                var(r,pack,sha)=HdFixture(); await HdPackInstaller.InstallAsync(r,"1.0.0",sha,new FileInfo(pack).Length,pack);
+                string pack2=Path.Combine(r,"v2.mpq"); byte[] b2=Bytes("hd pack v2 bigger"); File.WriteAllBytes(pack2,b2);
+                await HdPackInstaller.InstallAsync(r,"1.1.0",Hash(b2),b2.Length,pack2);
+                Check(Hash(File.ReadAllBytes(Full(r,"Data/patch-y.mpq")))==Hash(b2) && HdPackInstaller.Installed(r)!.Version=="1.1.0","Update failed");
+                // simulate a crash after the old pack was parked and before the new one moved in
+                Directory.CreateDirectory(Full(r,".coops-hdpack"));
+                File.Move(Full(r,"Data/patch-y.mpq"),Full(r,".coops-hdpack/previous.mpq"));
+                File.WriteAllText(Full(r,".coops-hdpack/pending.json"),"{\"op\":\"install\",\"version\":\"1.2.0\",\"sha256\":\""+new string('a',64)+"\",\"size\":5,\"hadPrevious\":true,\"previousEnabled\":true}");
+                await HdPackInstaller.RecoverIfNeededAsync(r);
+                Check(Hash(File.ReadAllBytes(Full(r,"Data/patch-y.mpq")))==Hash(b2),"Recovery did not restore the previous pack");
+                Check(!File.Exists(Full(r,".coops-hdpack/pending.json")),"Journal not cleared");
+            });
+            // patch-y quarantine matrix: spared only when listed + authorized hash + required core + enabled receipt.
+            static async Task<(string Root, UpdateManifest M, ReleaseUpdater U, string PackSha, string CoreSha)> QFixture()
+            {
+                var(r,m,u)=Fixture(); await u.ApplyAsync(m);
+                m.ObsoleteFiles.Add(new ObsoleteFile{Path="Data/patch-y.mpq",Action="quarantine"});
+                string core=m.Files.Single(f=>f.Destination.Replace('\\','/').Equals("Data/patch-z.mpq",StringComparison.OrdinalIgnoreCase)).Sha256;
+                string pack=Path.Combine(r,"pack.mpq"); byte[] b=Bytes("hd pack"); File.WriteAllBytes(pack,b);
+                await HdPackInstaller.InstallAsync(r,"1.0.0",Hash(b),b.Length,pack);
+                return (r,m,u,Hash(b),core);
+            }
+            static OptionalPack Op(string sha,string core) => new(){Name="HD Environment Pack",Destination="Data/patch-y.mpq",Sha256=new(){sha},RequiredCoreSha256=new(){core}};
+            await Run("legacy/unknown patch-y is quarantined (no optional-pack entry, no receipt)",async()=> {
+                var(r,m,u)=Fixture(); await u.ApplyAsync(m);
+                m.ObsoleteFiles.Add(new ObsoleteFile{Path="Data/patch-y.mpq",Action="quarantine"});
+                File.WriteAllBytes(Full(r,"Data/patch-y.mpq"),Bytes("legacy eye patch"));
+                var res=await u.ApplyAsync(m); Check(res.Quarantined.Contains("data/patch-y.mpq") && !File.Exists(Full(r,"Data/patch-y.mpq")),"Legacy patch-y not quarantined");
+            });
+            await Run("installed HD pack is still quarantined when the manifest does not list it",async()=> {
+                var(r,m,u,sha,core)=await QFixture();
+                var res=await u.ApplyAsync(m); Check(res.Quarantined.Contains("data/patch-y.mpq"),"Unlisted pack spared");
+            });
+            await Run("listed, authorized, enabled HD pack for the required core is spared and not warned about",async()=> {
+                var(r,m,u,sha,core)=await QFixture(); m.OptionalPacks.Add(Op(sha,core));
+                Check(u.ScanArchives(m).Warnings.All(w=>!w.Contains("patch-y")),"Authorized pack reported as unsupported");
+                var res=await u.ApplyAsync(m); Check(!res.Quarantined.Any() && File.Exists(Full(r,"Data/patch-y.mpq")),"Authorized pack quarantined");
+            });
+            await Run("HD pack with an unauthorized hash is quarantined",async()=> {
+                var(r,m,u,sha,core)=await QFixture(); m.OptionalPacks.Add(Op(new string('b',64),core));
+                var res=await u.ApplyAsync(m); Check(res.Quarantined.Contains("data/patch-y.mpq"),"Unauthorized hash spared");
+            });
+            await Run("HD pack is quarantined when the required core is not the release core",async()=> {
+                var(r,m,u,sha,core)=await QFixture(); m.OptionalPacks.Add(Op(sha,new string('c',64)));
+                var res=await u.ApplyAsync(m); Check(res.Quarantined.Contains("data/patch-y.mpq"),"Wrong-core pack spared");
+            });
+            await Run("modified HD pack (bytes no longer match receipt) is quarantined",async()=> {
+                var(r,m,u,sha,core)=await QFixture(); m.OptionalPacks.Add(Op(sha,core));
+                File.WriteAllBytes(Full(r,"Data/patch-y.mpq"),Bytes("hd pacK"));
+                var res=await u.ApplyAsync(m); Check(res.Quarantined.Contains("data/patch-y.mpq"),"Modified pack spared");
+            });
+            await Run("manifest rejects an optional pack that would load above the core or collides with a managed file",async()=> {
+                var(r,m,u)=Fixture(); string h=new string('a',64);
+                m.OptionalPacks.Add(new OptionalPack{Destination="Data/patch-~.mpq",Sha256=new(){h},RequiredCoreSha256=new(){h}});
+                await Expect("MANIFEST_INVALID",()=>u.ApplyAsync(m));
+                m.OptionalPacks.Clear(); m.OptionalPacks.Add(new OptionalPack{Destination="Data/patch-z.mpq",Sha256=new(){h},RequiredCoreSha256=new(){h}});
                 await Expect("MANIFEST_INVALID",()=>u.ApplyAsync(m));
             });
             Console.WriteLine($"{passed} tests passed. All client writes used synthetic temporary fixtures.");

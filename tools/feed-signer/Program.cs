@@ -2,8 +2,8 @@
 //
 //   genkey  --private <file outside the repo> --public <file>
 //   sign    --private <file> --payload <payload.json> --out <metadata.json>
-//   verify  --public <file> --metadata <metadata.json> --channel launcher|lumenveil
-//   check-live   (build with -p:LauncherFeedKey=... -p:LumenveilFeedKey=...; checks the published feeds)
+//   verify  --public <file> --metadata <metadata.json> --channel launcher|lumenveil|hdenv
+//   check-live   (build with -p:LauncherFeedKey=... -p:LumenveilFeedKey=... -p:HdEnvFeedKey=...; checks the published feeds)
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -61,12 +61,13 @@ switch (command)
     {
         using var http = new HttpClient();
         http.DefaultRequestHeaders.UserAgent.ParseAdd("CoopsWoWLauncher-FeedCheck/1.0");
-        foreach (var (name, feed) in new[] { ("launcher", SignedPackageFeed.Launcher(http)), ("lumenveil", SignedPackageFeed.Lumenveil(http)) })
+        foreach (var (name, feed) in new[] { ("launcher", SignedPackageFeed.Launcher(http)), ("lumenveil", SignedPackageFeed.Lumenveil(http)), ("hdenv", SignedPackageFeed.HdEnvironment(http)) })
         {
             PackageMetadata? package = await feed.CheckAsync();
             if (package is null) throw new InvalidDataException($"{name}: feed unavailable (no key embedded or 404).");
             Console.WriteLine($"{name}: accepted {package.Version} {package.Url} size {package.Size} sha256 {package.Sha256}" +
-                (name == "lumenveil" ? $" installable={package.InstallationEnabled} wow={string.Join(",", package.CompatibleWowSha256)} files={package.Files.Length}" : ""));
+                (name == "lumenveil" ? $" installable={package.InstallationEnabled} wow={string.Join(",", package.CompatibleWowSha256)} files={package.Files.Length}" :
+                 name == "hdenv" ? $" installable={package.InstallationEnabled} core={string.Join(",", package.RequiredCoreSha256)}" : ""));
         }
         break;
     }

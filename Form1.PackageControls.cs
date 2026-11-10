@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 namespace CoopsWoWLauncher;
 
 public partial class Form1
@@ -296,7 +296,7 @@ public partial class Form1
 
     private async Task ChangeGraphicsAsync(bool remove)
     {
-        if (graphicsBusy || patchBusy || (!remove && (!graphicsCompatible || graphicsZip is null || graphicsPackage is null)))
+        if (graphicsBusy || patchBusy || hdMutating || (!remove && (!graphicsCompatible || graphicsZip is null || graphicsPackage is null)))
             return;
         string client = wowPath;
         graphicsBusy = graphicsMutating = true;
@@ -361,6 +361,15 @@ public partial class Form1
             var environment = await LumenveilInstaller.LaunchEnvironmentAsync(wowPath);
             using Process? wow = await StartWowAsync();
             LogStagingProgress($"Launched Wow.exe pid {wow?.Id} with ReShade layer {(environment.Count > 0 ? "enabled" : "absent")}");
+        }
+        else if (mode == "hd")
+        {
+            // check -> download -> install -> disable -> enable, logging the visible status after each step
+            await CheckHdPackAsync(); LogStagingProgress("hd check | " + hdStatus.Text.ReplaceLineEndings(" | "));
+            await DownloadHdPackAsync(); LogStagingProgress("hd download | " + hdStatus.Text.ReplaceLineEndings(" | "));
+            await ChangeHdPackAsync("install"); LogStagingProgress("hd install | " + hdStatus.Text.ReplaceLineEndings(" | "));
+            await ChangeHdPackAsync("toggle"); LogStagingProgress("hd disable | " + hdStatus.Text.ReplaceLineEndings(" | "));
+            await ChangeHdPackAsync("toggle"); LogStagingProgress("hd enable | " + hdStatus.Text.ReplaceLineEndings(" | "));
         }
         else if (mode == "update")
         {
