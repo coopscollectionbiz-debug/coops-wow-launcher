@@ -68,13 +68,50 @@ internal static class LumenveilInstaller
         return environment;
     }
 
-    /// <summary>DXVK, and with it Lumenveil and ReShade, needs the 32-bit Vulkan runtime from the graphics driver.</summary>
-    private static void EnsureVulkanRuntime()
+    /// <summary>
+    /// DXVK and the ReShade layer need the 32-bit Vulkan runtime that graphics drivers with Vulkan support install.
+    /// Lumenveil itself runs on the game's own Direct3D 9, so without Vulkan it is installed without them.
+    /// </summary>
+    internal static bool VulkanRuntimeAvailable()
     {
+#if STAGING_FEEDS
+        if (Environment.GetEnvironmentVariable("COOPS_LAUNCHER_TEST_NO_VULKAN") == "1")
+            return false;
+#endif
         string wow64 = Environment.GetFolderPath(Environment.SpecialFolder.SystemX86);
-        if (!string.IsNullOrEmpty(wow64) && !File.Exists(Path.Combine(wow64, "vulkan-1.dll")))
-            throw new IOException("Lumenveil needs a graphics driver with Vulkan support, and the 32-bit Vulkan runtime " +
-                "(vulkan-1.dll) was not found. Update your graphics driver, then install Lumenveil again.");
+        return string.IsNullOrEmpty(wow64) || File.Exists(Path.Combine(wow64, "vulkan-1.dll"));
+    }
+
+    /// <summary>Package files that only work on Vulkan: DXVK, its settings, and ReShade with its presets and shaders.</summary>
+    internal static bool NeedsVulkan(string path) =>
+        path.Equals("d3d9.dll", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("dxvk.conf", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("ReShade.ini", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("ReShadePreset.ini", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("ReShade-Lumenveil.ini", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith(LayerDirectory + "/", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("reshade-shaders/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// True when the installed package left out DXVK and ReShade because Vulkan was missing; false when they are
+    /// installed or nothing is installed.
+    /// </summary>
+    internal static bool InstalledWithoutVulkanFiles(string client, PackageMetadata? package)
+    {
+        try
+        {
+            if (!HasState(client)) return false;
+            Receipt? receipt = Read<Receipt>(SafePath(client, StateName), "installed.json");
+            if (receipt is null || receipt.Files.Length == 0) return false;
+            IEnumerable<string> expected = package is not null && package.Version == receipt.Version
+                ? package.Files : ["d3d9.dll"];
+            return expected.Any(path => NeedsVulkan(path) &&
+                !receipt.Files.Any(f => f.Path.Equals(path, StringComparison.OrdinalIgnoreCase)));
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     internal static bool CanInstall(PackageMetadata package) => package.InstallationEnabled &&
@@ -126,8 +163,7 @@ internal static class LumenveilInstaller
         if (!await IsCompatibleAsync(client, package))
             throw new InvalidDataException("This Wow.exe is outside the supported Lumenveil builds.");
         EnsureGameClosed(client);
-        if (package.Files.Contains(LayerDll, StringComparer.OrdinalIgnoreCase))
-            EnsureVulkanRuntime();
+        bool vulkan = VulkanRuntimeAvailable();
 
         string state = SafePath(client, StateName);
         Directory.CreateDirectory(state);
@@ -146,6 +182,11 @@ internal static class LumenveilInstaller
 
         using var archive = ZipFile.OpenRead(zip);
         var entries = Inspect(archive, package.Files);
+        // Without Vulkan, DXVK would stop the game from starting: leave it and ReShade out and let Lumenveil run on
+        // the game's Direct3D 9. Installing again once the driver has Vulkan adds them.
+        if (!vulkan)
+            foreach (string path in entries.Keys.Where(NeedsVulkan).ToArray())
+                entries.Remove(path);
         var owned = (receipt?.Files ?? []).ToDictionary(f => f.Path, StringComparer.OrdinalIgnoreCase);
         var replacedBefore = (receipt?.Replaced ?? []).ToDictionary(f => f.Path, StringComparer.OrdinalIgnoreCase);
         var missing = new List<(string Path, ZipArchiveEntry Entry)>();

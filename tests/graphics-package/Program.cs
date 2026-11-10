@@ -4,7 +4,7 @@
 //
 // dotnet run --project tests/graphics-package -- --output <new dir> --client <disposable client>
 //     --package <dir with Lumenveil-<v>.zip and package-manifest.json> [--source C:\WoWClient-Worgen-Test]
-//     [--skip-self-update] [--no-plant] [--launch]
+//     [--skip-self-update] [--no-plant] [--launch] [--allow-source-drift]
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
@@ -53,7 +53,12 @@ using (var archive = ZipFile.OpenRead(zipPath))
         using var s = entry.Open();
         Assert(Hex(SHA256.HashData(s)) == f.Packaged.ToUpperInvariant(), "ZIP bytes differ for " + f.Path);
         string live = Sha(f.From);
-        Assert(live == f.Source.ToUpperInvariant(), "Worgen source changed since packaging: " + f.Path);
+        // --allow-source-drift: the package bytes are checked either way; a player-side edit to the source client
+        // after packaging (a ReShade preset toggled in game) is reported instead of stopping the run.
+        if (live != f.Source.ToUpperInvariant() && opts.ContainsKey("allow-source-drift"))
+            Console.WriteLine("NOTE Worgen source changed since packaging (package bytes still verified): " + f.Path);
+        else
+            Assert(live == f.Source.ToUpperInvariant(), "Worgen source changed since packaging: " + f.Path);
         Assert(f.Adjusted || f.Source.Equals(f.Packaged, StringComparison.OrdinalIgnoreCase), "Unexplained difference for " + f.Path);
     }
 }
@@ -190,6 +195,8 @@ try
         Pass("interrupted removal rolled back to the installed state on next launch; a later removal completed cleanly");
     }
 
+    NoVulkanCheck(opts.ContainsKey("launch"));
+
     if (opts.ContainsKey("launch"))
         LaunchCheck();
 
@@ -235,6 +242,123 @@ finally
     File.WriteAllLines(Path.Combine(root, "graphics-package-smoke.txt"), report);
 }
 Console.WriteLine("ALL PASS");
+
+// Without a Vulkan driver the launcher installs Lumenveil without DXVK and ReShade; Lumenveil then runs on the game's
+// own Direct3D 9. Installing again once Vulkan is there adds the rest. The staging build is told Vulkan is missing.
+void NoVulkanCheck(bool launch)
+{
+    var aside = new List<(string From, string To)>();
+    foreach (string p in planted)
+    {
+        aside.Add((Path.Combine(client, p), Path.Combine(root, "aside-" + p)));
+        File.Move(aside[^1].From, aside[^1].To);
+    }
+    try
+    {
+        var clean = Snapshot(client);
+        var vulkanFiles = files.Where(f => IsVulkanFile(f.Path)).ToList();
+        Assert(vulkanFiles.Count > 0 && vulkanFiles.Any(f => f.Path == "d3d9.dll"), "Package has no Vulkan-only files to leave out");
+
+        var lean = NewRun("install without vulkan");
+        Smoke(lean, "graphics-install", noVulkan: true);
+        Assert(File.ReadAllText(lean.Log).Contains($"Lumenveil {version} installed without DXVK and ReShade"),
+            "Install without Vulkan did not report the reduced install:\n" + File.ReadAllText(lean.Log));
+        foreach (var f in files)
+        {
+            string p = Path.Combine(client, f.Path);
+            if (IsVulkanFile(f.Path))
+                Assert(clean.GetValueOrDefault(f.Path) == (File.Exists(p) ? Sha(p) : null), "Install without Vulkan wrote " + f.Path);
+            else
+                Assert(File.Exists(p) && Sha(p) == f.Packaged.ToUpperInvariant(), "Install without Vulkan lacks " + f.Path);
+        }
+        Pass($"without Vulkan: installed {files.Count - vulkanFiles.Count} Lumenveil files and left out {vulkanFiles.Count} DXVK/ReShade files");
+
+        var detect = NewRun("detect without vulkan");
+        Smoke(detect, "graphics", noVulkan: true);
+        Assert(File.ReadLines(detect.Log).First().Contains("installed without DXVK and ReShade (no Vulkan driver found)"),
+            "Launcher did not report the reduced install");
+        var detectVk = NewRun("detect reduced with vulkan");
+        Smoke(detectVk, "graphics");
+        Assert(File.ReadLines(detectVk.Log).First().Contains("Vulkan is now available: choose Install to add them"),
+            "Launcher did not offer to add DXVK and ReShade once Vulkan is there");
+        Pass("launcher reports the reduced install, and offers to add DXVK and ReShade once Vulkan is available");
+
+        var runtime = RuntimeFiles();
+        if (launch)
+        {
+            var launchRun = NewRun("launch without vulkan files");
+            var started = DateTime.Now.AddSeconds(-2);
+            Smoke(launchRun, "launch", noVulkan: true);
+            string line = File.ReadAllText(launchRun.Log);
+            var m = Regex.Match(line, @"pid (\d+) with ReShade layer (\w+)");
+            Assert(m.Success && m.Groups[2].Value == "absent", "Launch without DXVK/ReShade enabled a layer: " + line);
+            int pid = int.Parse(m.Groups[1].Value);
+            var evidence = new List<string>();
+            try
+            {
+                string fogLog = Path.Combine(client, "CoAVolFog.log");
+                WaitUntil(() => Fresh(fogLog, started) && ReadShared(fogLog).Contains("CoAVolFog loaded from"), "CoAVolFog.log start line");
+                WaitUntil(() => ReadShared(fogLog).Contains("CreateDevice:"), "Lumenveil device creation on Direct3D 9");
+                Thread.Sleep(8000);
+                Assert(Process.GetProcessesByName("Wow").Any(p => p.Id == pid), "WoW exited while running on Direct3D 9");
+                string fog = ReadShared(fogLog);
+                string device = fog.Split('\n').Last(l => l.Contains("CreateDevice:")).Trim();
+                Assert(device.Contains("fog=1"), "Lumenveil did not take the Direct3D 9 device: " + device);
+                var modules = Modules(pid);
+                Assert(modules.Any(x => x.EndsWith(@"\CoAVolFog.dll", StringComparison.OrdinalIgnoreCase) &&
+                    x.StartsWith(client, StringComparison.OrdinalIgnoreCase)), "CoAVolFog.dll not loaded from the client");
+                Assert(!modules.Any(x => x.StartsWith(client, StringComparison.OrdinalIgnoreCase) &&
+                    (x.EndsWith(@"\d3d9.dll", StringComparison.OrdinalIgnoreCase) || x.Contains(@"\ReShade\", StringComparison.OrdinalIgnoreCase))),
+                    "A DXVK or ReShade module loaded from the client");
+                string? d3d9 = modules.FirstOrDefault(x => x.EndsWith(@"\d3d9.dll", StringComparison.OrdinalIgnoreCase));
+                // A 32-bit process sees SysWOW64 as System32, so either name is the system Direct3D 9.
+                string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                Assert(d3d9 is not null && (Path.GetDirectoryName(d3d9)!.Equals(Path.Combine(windows, "System32"), StringComparison.OrdinalIgnoreCase) ||
+                    Path.GetDirectoryName(d3d9)!.Equals(Path.Combine(windows, "SysWOW64"), StringComparison.OrdinalIgnoreCase)),
+                    "The game did not use the system Direct3D 9: " + d3d9);
+                Assert(!modules.Any(x => x.EndsWith(@"\vulkan-1.dll", StringComparison.OrdinalIgnoreCase)), "Vulkan was loaded without DXVK");
+                evidence.Add(device);
+                evidence.Add("d3d9 " + d3d9);
+                evidence.AddRange(modules.Where(x => x.StartsWith(client, StringComparison.OrdinalIgnoreCase)).Select(x => "module " + x));
+            }
+            finally
+            {
+                try { using var wowProcess = Process.GetProcessById(pid); wowProcess.Kill(); wowProcess.WaitForExit(15000); } catch { }
+                WaitUntil(() => !ClientWowRunning(client), "the test WoW to exit");
+                File.WriteAllLines(Path.Combine(root, "launch-no-vulkan-evidence.txt"), evidence);
+            }
+            foreach (string e in evidence) Console.WriteLine("  " + e);
+            Pass("launched without DXVK/ReShade: Lumenveil loaded from the client and rendered on the system Direct3D 9, no Vulkan loaded");
+        }
+
+        Smoke(NewRun("add vulkan files"), "graphics-install");
+        foreach (var f in files)
+            Assert(Sha(Path.Combine(client, f.Path)) == f.Packaged.ToUpperInvariant(), "Install with Vulkan did not complete " + f.Path);
+        var full = NewRun("detect after adding vulkan files");
+        Smoke(full, "graphics");
+        Assert(File.ReadLines(full.Log).First().Contains($"Lumenveil {version} is installed."), "Launcher still reports a reduced install");
+        Pass("installing again with Vulkan added DXVK and ReShade to the reduced install");
+
+        Smoke(NewRun("remove after reduced install"), "graphics-remove");
+        var after = Snapshot(client);
+        var left = clean.Keys.Union(after.Keys, StringComparer.OrdinalIgnoreCase)
+            .Where(k => clean.GetValueOrDefault(k) != after.GetValueOrDefault(k) && !(launch && runtime.IsMatch(k))).ToList();
+        Assert(left.Count == 0, "Removal after the reduced install left differences:\n" + string.Join("\n", left.Take(40)));
+        Pass("removal after the reduced install and its completion restored the client");
+    }
+    finally
+    {
+        foreach (var (from, to) in aside)
+            if (File.Exists(to) && !File.Exists(from)) File.Move(to, from);
+    }
+}
+
+static bool IsVulkanFile(string path) =>
+    path is "d3d9.dll" or "dxvk.conf" or "ReShade.ini" or "ReShadePreset.ini" or "ReShade-Lumenveil.ini" ||
+    path.StartsWith("ReShade/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("reshade-shaders/", StringComparison.OrdinalIgnoreCase);
+
+// What the game itself writes while running belongs to the player (logs, cache, config).
+static Regex RuntimeFiles() => new(@"^(Logs|Cache|WTF|Errors|Screenshots)\\|^(ReShade\.log\d*|CoAVolFog\.log|wow_d3d9\.log|LuxVelum\.log|Lexara\.log)$", RegexOptions.IgnoreCase);
 
 // Installs through the launcher, starts WoW through the launcher's Launch path, and checks what actually loaded.
 void LaunchCheck()
@@ -397,10 +521,13 @@ Run NewRun(string name)
         Path.Combine(folder, ".coops-launcher-update"));
 }
 
-void Smoke(Run run, string mode)
+void Smoke(Run run, string mode, bool noVulkan = false)
 {
-    using var p = Process.Start(new ProcessStartInfo(run.Exe) { UseShellExecute = false, CreateNoWindow = true,
-        ArgumentList = { "--staging-smoke", mode } })!;
+    var psi = new ProcessStartInfo(run.Exe) { UseShellExecute = false, CreateNoWindow = true,
+        ArgumentList = { "--staging-smoke", mode } };
+    if (noVulkan)
+        psi.Environment["COOPS_LAUNCHER_TEST_NO_VULKAN"] = "1";
+    using var p = Process.Start(psi)!;
     Assert(p.WaitForExit(180_000), $"Launcher smoke did not exit ({mode})");
     Assert(p.ExitCode == 0, $"Launcher smoke returned {p.ExitCode} ({mode})");
     if (mode.StartsWith("graphics-") && File.Exists(run.Log))

@@ -218,6 +218,8 @@ public partial class Form1
                 await Task.Run(() => LumenveilInstaller.RecoverIfNeededAsync(client));
             bool compatible = package is not null && await LumenveilInstaller.IsCompatibleAsync(client, package);
             string? installed = LumenveilInstaller.InstalledVersion(client);
+            bool vulkan = LumenveilInstaller.VulkanRuntimeAvailable();
+            bool withoutVulkanFiles = LumenveilInstaller.InstalledWithoutVulkanFiles(client, package);
             if (IsDisposed || client != wowPath || package != graphicsPackage) return;
             graphicsCompatible = compatible;
             if (package is null)
@@ -229,8 +231,14 @@ public partial class Form1
                     ? string.Join(", ", package.Prerequisites) : "No published prerequisites";
                 string builds = package.SupportedBuilds is { Length: > 0 } buildsList
                     ? string.Join(", ", buildsList) : "No supported builds published";
-                string compatibility = installed is not null ? $"Lumenveil {installed} is installed."
-                    : compatible ? "Selected client is supported."
+                string compatibility = installed is not null
+                    ? withoutVulkanFiles
+                        ? vulkan ? $"Lumenveil {installed} is installed without DXVK and ReShade. Vulkan is now available: choose Install to add them."
+                            : $"Lumenveil {installed} is installed without DXVK and ReShade (no Vulkan driver found)."
+                        : $"Lumenveil {installed} is installed."
+                    : compatible
+                        ? vulkan ? "Selected client is supported."
+                            : "Selected client is supported. No Vulkan driver was found, so Lumenveil will be installed without DXVK and ReShade."
                     : "Installation is unavailable for the selected client.";
                 graphicsStatus.Text = $"Optional Graphics · Lumenveil {package.Version} · {DownloadStatus.FormatBytes(package.Size)}\n" +
                     $"{builds}. {compatibility}\nPrerequisites · {prerequisites}";
@@ -310,7 +318,10 @@ public partial class Form1
                     if (reporting && !IsDisposed) RenderPackageProgress(graphicsStatus, graphicsBar, s);
                 });
                 await Task.Run(() => LumenveilInstaller.InstallAsync(client, graphicsPackage!, graphicsZip!, progress));
-                graphicsStatus.Text = $"Lumenveil {graphicsPackage!.Version} installed.";
+                graphicsStatus.Text = LumenveilInstaller.InstalledWithoutVulkanFiles(client, graphicsPackage)
+                    ? $"Lumenveil {graphicsPackage!.Version} installed without DXVK and ReShade, because no Vulkan driver was found. " +
+                      "Lumenveil runs on the game's own Direct3D 9. After a graphics driver update with Vulkan, choose Install again to add them."
+                    : $"Lumenveil {graphicsPackage!.Version} installed.";
             }
         }
         catch (Exception ex)
