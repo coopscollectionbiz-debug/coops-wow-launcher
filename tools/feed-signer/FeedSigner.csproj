@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Include="../../SignedPackageFeed.cs" Link="SignedPackageFeed.cs" />
     <Compile Include="../../ReleaseUpdater.cs" Link="ReleaseUpdater.cs" />
+    <Compile Include="../../ClientOptions.cs" Link="ClientOptions.cs" />
     <Compile Include="../../DownloadProgress.cs" Link="DownloadProgress.cs" />
     <Compile Include="../../HdPackInstaller.cs" Link="HdPackInstaller.cs" />
     <AssemblyMetadata Include="LauncherFeedKey" Value="$(LauncherFeedKey)" />
