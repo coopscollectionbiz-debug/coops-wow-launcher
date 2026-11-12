@@ -11,6 +11,7 @@
     <Compile Include="../ReleaseUpdater.cs" Link="ReleaseUpdater.cs" />
     <Compile Include="../DownloadProgress.cs" Link="DownloadProgress.cs" />
     <Compile Include="../HdPackInstaller.cs" Link="HdPackInstaller.cs" />
+    <Compile Include="../ClientOptions.cs" Link="ClientOptions.cs" />
     <None Include="../manifest.json" Link="manifest.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

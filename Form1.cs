@@ -102,6 +102,7 @@ public partial class Form1 : Form
         Controls.Add(launchButton);
         InitializePackageControls();
         InitializeHdPackControls();
+        InitializeClientOptionsControls();
 
         LoadSavedPath();
         RefreshStatus();
@@ -165,6 +166,7 @@ public partial class Form1 : Form
 
         launchButton.Enabled = validWow;
         patchButton.Enabled = validWow;
+        if (optionsButton is not null) optionsButton.Enabled = validWow;
 
         if (validWow)
             statusLabel.Text = $"WoW detected:\n{wowPath}";

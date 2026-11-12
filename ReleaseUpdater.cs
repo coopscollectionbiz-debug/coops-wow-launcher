@@ -33,6 +33,8 @@ public sealed class UpdateManifest
     // core this release installs is one of RequiredCoreSha256, and the player enabled it through the launcher.
     // Launchers that predate this field ignore it, so for them the quarantine rule still applies.
     public List<OptionalPack> OptionalPacks { get; set; } = new();
+    // Categories of optional archives a player may turn off (launcher 1.5.0+; see ClientOptions.cs).
+    public List<ClientOption> ClientOptions { get; set; } = new();
 }
 
 public sealed class OptionalPack
@@ -288,7 +290,7 @@ internal sealed class BaselineCacheEntry
 // Updater
 // ---------------------------------------------------------------------------
 
-public sealed class ReleaseUpdater
+public sealed partial class ReleaseUpdater
 {
     public const string StateDirName = "_CoopsLauncher";
 
@@ -348,6 +350,8 @@ public sealed class ReleaseUpdater
 
         m.ObsoleteFiles ??= new();
         m.RequiredBaseline ??= new();
+        m.OptionalPacks ??= new();
+        m.ClientOptions ??= new();
         return m;
     }
 
@@ -419,6 +423,8 @@ public sealed class ReleaseUpdater
             if (b.AcceptedVariants.Any(v => v == null || !ValidHash(v.Sha256) || v.Size <= 0))
                 throw InvalidManifest("Invalid accepted variant for baseline file: " + b.Path);
         }
+        m.ClientOptions ??= new();
+        ValidateClientOptions(m);
     }
 
     /// <summary>
@@ -521,11 +527,15 @@ public sealed class ReleaseUpdater
         Dictionary<string, BaselineCacheEntry> cache = LoadBaselineCache();
         bool cacheChanged = false;
         int n = 0;
+        // Archives the player turned off (client options) are a choice, not a missing or changed file.
+        HashSet<string> turnedOff = DisabledArchives(m);
 
         foreach (BaselineFile b in m.RequiredBaseline)
         {
             ct.ThrowIfCancellationRequested();
             n++;
+            if (turnedOff.Contains(Norm(b.Path)))
+                continue;
             string full = Resolve(b.Path);
             string label = b.Path + (b.Critical && b.Note != null ? $" ({b.Note})" : "");
 
@@ -591,6 +601,7 @@ public sealed class ReleaseUpdater
         foreach (BaselineFile b in m.RequiredBaseline) known.Add(Norm(b.Path));
         foreach (UpdateFile f in m.Files) known.Add(Norm(f.Destination));
         foreach (ObsoleteFile o in m.ObsoleteFiles) known.Add(Norm(o.Path));
+        foreach (ClientOption o in m.ClientOptions.Where(o => o.Restore != null)) known.Add(Norm(o.Restore!.Destination));
 
         string data = Path.Combine(root, "Data");
         if (!Directory.Exists(data))
@@ -647,6 +658,8 @@ public sealed class ReleaseUpdater
             result.RecoveryNote = "An interrupted installation was rolled back to your previous files before updating.";
 
         Report("Checking client files...");
+        await ReEnableLockedArchivesAsync(m, result, ct);
+        HashSet<string> turnedOff = DisabledArchives(m);
         BaselineReport baseline = await VerifyBaselineAsync(m, ct);
         if (!baseline.Ok)
         {
@@ -675,6 +688,8 @@ public sealed class ReleaseUpdater
         var needed = new List<(UpdateFile File, string Dest, bool Exists, string? CurrentSha, long CurrentSize)>();
         foreach (UpdateFile f in m.Files.Where(x => x.Type.Equals("file", StringComparison.OrdinalIgnoreCase)))
         {
+            if (turnedOff.Contains(Norm(f.Destination)))
+                continue;   // turned off by the player: never re-download or re-enable
             string dest = Resolve(f.Destination);
             if (File.Exists(dest))
             {
@@ -704,6 +719,7 @@ public sealed class ReleaseUpdater
         if (needed.Count == 0 && obsolete.Count == 0)
         {
             WriteReceiptIfChanged(m, null);
+            if (await ReconcileRestoreArchivesAsync(m, turnedOff, result, ct)) result.Changed = true;
             return result;
         }
 
@@ -861,6 +877,7 @@ public sealed class ReleaseUpdater
         result.BackupDirectory = j.Ops.Any(o => o.BackupPath != null) ? txBackup : null;
         result.Installed.AddRange(j.Ops.Where(o => o.Kind == "replace").Select(o => o.Path));
         result.Quarantined.AddRange(j.Ops.Where(o => o.Kind == "quarantine").Select(o => o.Path));
+        await ReconcileRestoreArchivesAsync(m, turnedOff, result, ct);
         return result;
     }
 

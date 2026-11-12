@@ -327,6 +327,7 @@ static class Tests
                 m.OptionalPacks.Clear(); m.OptionalPacks.Add(new OptionalPack{Destination="Data/patch-z.mpq",Sha256=new(){h},RequiredCoreSha256=new(){h}});
                 await Expect("MANIFEST_INVALID",()=>u.ApplyAsync(m));
             });
+            await OptionTests.RunAll(Sandbox, Run);
             Console.WriteLine($"{passed} tests passed. All client writes used synthetic temporary fixtures.");
         }
         finally { if(Directory.Exists(Sandbox)) Directory.Delete(Sandbox,true); }
