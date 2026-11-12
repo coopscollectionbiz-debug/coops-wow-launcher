@@ -93,6 +93,16 @@ public sealed class BaselineFile
     // Critical is descriptive metadata, not a requirement/optionality switch.
     public bool Optional { get; set; }
     public string? Note { get; set; }
+    // Additional exact builds the manifest accepts in place of Sha256/Size (for example a known patched Wow.exe).
+    // Each is matched by exact size and SHA-256. Older launchers ignore this field and still require Sha256.
+    public List<BaselineVariant> AcceptedVariants { get; set; } = new();
+}
+
+public sealed class BaselineVariant
+{
+    public string Sha256 { get; set; } = "";
+    public long Size { get; set; }
+    public string? Note { get; set; }
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +412,13 @@ public sealed class ReleaseUpdater
                 throw InvalidManifest("Optional pack entry is invalid: " + p.Destination);
             if (p.CoreDestination is not null) Resolve(p.CoreDestination);
         }
-        foreach (BaselineFile b in m.RequiredBaseline) Resolve(b.Path);
+        foreach (BaselineFile b in m.RequiredBaseline)
+        {
+            Resolve(b.Path);
+            b.AcceptedVariants ??= new();
+            if (b.AcceptedVariants.Any(v => v == null || !ValidHash(v.Sha256) || v.Size <= 0))
+                throw InvalidManifest("Invalid accepted variant for baseline file: " + b.Path);
+        }
     }
 
     /// <summary>
@@ -521,7 +537,8 @@ public sealed class ReleaseUpdater
             }
 
             var info = new FileInfo(full);
-            if (info.Length != b.Size)
+            var variants = (b.AcceptedVariants ?? new()).Where(v => v != null && ValidHash(v.Sha256) && v.Size > 0).ToList();
+            if (info.Length != b.Size && !variants.Any(v => v.Size == info.Length))
             {
                 report.Mismatched.Add($"{label}: size {info.Length:N0}, expected {b.Size:N0}");
                 continue;
@@ -547,7 +564,9 @@ public sealed class ReleaseUpdater
                 cacheChanged = true;
             }
 
-            if (!hash.Equals(b.Sha256, StringComparison.OrdinalIgnoreCase))
+            bool accepted = (info.Length == b.Size && hash.Equals(b.Sha256, StringComparison.OrdinalIgnoreCase)) ||
+                variants.Any(v => v.Size == info.Length && hash.Equals(v.Sha256, StringComparison.OrdinalIgnoreCase));
+            if (!accepted)
             {
                 report.Mismatched.Add($"{label}: content differs from the supported client");
                 cache.Remove(key);

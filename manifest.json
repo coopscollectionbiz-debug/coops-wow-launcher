@@ -651,7 +651,14 @@
       "sha256": "4c459de64d38b5795becc6c01a03ba00d34686598fae707c442446722617868a",
       "size": 7704216,
       "critical": true,
-      "note": "WoW 3.3.5.12340 executable"
+      "note": "WoW 3.3.5.12340 executable",
+      "acceptedVariants": [
+        {
+          "sha256": "3bd126a7d69a9177970cb0823f7e251f8b641f3625d599210ce6b2ae5ab6687c",
+          "size": 7707648,
+          "note": "12340 with St0ny AIO patches (Lexara/LuxVelum loaders)"
+        }
+      ]
     }
   ]
 }

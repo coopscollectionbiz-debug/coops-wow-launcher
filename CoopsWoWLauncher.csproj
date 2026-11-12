@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version Condition="'$(Version)' == ''">1.4.0</Version>
+    <Version Condition="'$(Version)' == ''">1.4.1</Version>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
     <DefineConstants Condition="'$(StagingFeeds)' == 'true'">$(DefineConstants);STAGING_FEEDS</DefineConstants>
     <!-- Production feed trust keys (public halves only; the private keys stay with the release signer).

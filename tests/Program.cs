@@ -97,6 +97,25 @@ static class Tests
                 var (r,m,u)=Fixture(); var b=m.RequiredBaseline.Single(b=>b.Path=="Wow.exe"); Write(r,b.Path,new byte[b.Size]);
                 await Expect("UNSUPPORTED_BASELINE",()=>u.ApplyAsync(m));
             });
+            await Run("accepted Wow.exe variant passes; other content at its size fails",async()=> {
+                var (r,m,u)=Fixture(); var b=m.RequiredBaseline.Single(b=>b.Path=="Wow.exe");
+                byte[] patched=Bytes("patched exe variant"); b.AcceptedVariants=new(){ new BaselineVariant{Sha256=Hash(patched),Size=patched.Length} };
+                Write(r,b.Path,patched); Check((await u.VerifyBaselineAsync(m)).Ok,"Accepted variant rejected");
+                Check((await u.ApplyAsync(m)).Changed && Hash(File.ReadAllBytes(Full(r,b.Path)))==Hash(patched),"Variant install failed or exe touched");
+                byte[] other=Bytes("patched exe VARIANT"); Write(r,b.Path,other); u.ForceBaselineRehash=true;
+                await Expect("UNSUPPORTED_BASELINE",()=>u.ApplyAsync(m));
+            });
+            await Run("real manifest accepts only the stock and St0ny Wow.exe builds",()=> {
+                var b=Manifest().RequiredBaseline.Single(b=>b.Path=="Wow.exe");
+                Check(b.Sha256=="4c459de64d38b5795becc6c01a03ba00d34686598fae707c442446722617868a" && b.Size==7704216,"Stock exe changed");
+                Check(b.AcceptedVariants.Count==1 && b.AcceptedVariants[0].Sha256=="3bd126a7d69a9177970cb0823f7e251f8b641f3625d599210ce6b2ae5ab6687c" && b.AcceptedVariants[0].Size==7707648,"Unexpected variants");
+                Check(Manifest().RequiredBaseline.Where(x=>x.Path!="Wow.exe").All(x=>x.AcceptedVariants.Count==0),"Variants on other files");
+                return Task.CompletedTask;
+            });
+            await Run("invalid accepted variant rejects manifest",async()=> {
+                var (r,m,u)=Fixture(); m.RequiredBaseline[0].AcceptedVariants=new(){ new BaselineVariant{Sha256="xyz",Size=1} };
+                await Expect("MANIFEST_INVALID",()=>u.ApplyAsync(m));
+            });
             await Run("post-Z and unknown locale overrides remain blocked",async()=> {
                 foreach(var path in new[]{"Data/patch-~.mpq","Data/enUS/patch-enUS-r.mpq"}) {
                     var (r,m,u)=Fixture(); Write(r,path,Bytes("override")); await Expect("UNEXPECTED_ARCHIVE",()=>u.ApplyAsync(m));
